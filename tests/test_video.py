@@ -36,11 +36,41 @@ def test_aspect_ratio_standard_buckets():
 
 
 def test_ratio_bucket():
-    assert compute_ratio_bucket("9:16") == "9:16"
-    assert compute_ratio_bucket("1:1") == "1:1"
-    assert compute_ratio_bucket("4:5") == "4:5"
-    assert compute_ratio_bucket("16:9") == "16:9"
-    assert compute_ratio_bucket("7:3") == "Other"
+    assert compute_ratio_bucket(576, 1024) == "9:16"
+    assert compute_ratio_bucket(576, 576) == "1:1"
+    assert compute_ratio_bucket(1080, 1350) == "4:5"
+    assert compute_ratio_bucket(1280, 720) == "16:9"
+    assert compute_ratio_bucket(1470, 630) == "Other"
+
+
+def test_aspect_ratio_and_bucket_from_spec_examples():
+    examples = [
+        (576, 1024, "9:16", "9:16"),
+        (576, 576, "1:1", "1:1"),
+        (1080, 1350, "4:5", "4:5"),
+        (1280, 720, "16:9", "16:9"),
+        (1470, 630, "7:3", "Other"),
+    ]
+    for width, height, expected_ratio, expected_bucket in examples:
+        assert compute_aspect_ratio(width, height) == expected_ratio
+        assert compute_ratio_bucket(width, height) == expected_bucket
+
+
+def test_ratio_bucket_within_one_percent_tolerance():
+    # 1080x1910 ≈ 9:16 within 1%, but reduced ratio is not exactly 9:16
+    assert compute_aspect_ratio(1080, 1910) != "9:16"
+    assert compute_ratio_bucket(1080, 1910) == "9:16"
+
+    # 1000x1005 ≈ 1:1 within 1%
+    assert compute_ratio_bucket(1000, 1005) == "1:1"
+
+
+def test_ratio_bucket_outside_one_percent_tolerance():
+    # Just outside ±1% of 9:16
+    assert compute_ratio_bucket(1080, 1900) == "Other"
+
+    # 7:3 ultrawide remains Other
+    assert compute_ratio_bucket(1470, 630) == "Other"
 
 
 def test_video_id_is_eight_digits():

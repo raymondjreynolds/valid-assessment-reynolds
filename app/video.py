@@ -1,7 +1,14 @@
 import struct
 import zlib
 
-STANDARD_RATIO_BUCKETS = ("9:16", "1:1", "4:5", "16:9")
+RATIO_BUCKET_TARGETS = {
+    "9:16": 9 / 16,
+    "1:1": 1.0,
+    "4:5": 4 / 5,
+    "16:9": 16 / 9,
+}
+CANONICAL_RATIO_BUCKETS = frozenset(RATIO_BUCKET_TARGETS)
+RATIO_BUCKET_TOLERANCE = 0.01  # ±1%
 
 _CONTAINER_BOXES = frozenset(
     {b"moov", b"trak", b"mdia", b"minf", b"stbl", b"edts", b"dinf"}
@@ -19,14 +26,24 @@ def compute_aspect_ratio(width: int, height: int) -> str:
     return f"{width // divisor}:{height // divisor}"
 
 
-def compute_ratio_bucket(aspect_ratio: str) -> str:
-    if aspect_ratio in STANDARD_RATIO_BUCKETS:
-        return aspect_ratio
+def compute_ratio_bucket(width: int, height: int) -> str:
+    ratio = width / height
+    for bucket, target in RATIO_BUCKET_TARGETS.items():
+        if abs(ratio - target) / target <= RATIO_BUCKET_TOLERANCE:
+            return bucket
     return "Other"
+
+
+def is_canonical_ratio_filter(ratio: str) -> bool:
+    return ratio in CANONICAL_RATIO_BUCKETS
 
 
 def generate_video_id(content: bytes) -> str:
     return f"{zlib.crc32(content) % 100_000_000:08d}"
+
+
+def is_valid_video_id(video_id: str) -> bool:
+    return len(video_id) == 8 and video_id.isdigit()
 
 
 def _read_box_header(data: bytes, offset: int, end: int) -> tuple[int, bytes, int] | None:

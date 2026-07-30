@@ -1,5 +1,4 @@
-from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import Response
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 
 from app.storage import StoredVideo, VideoStore
@@ -8,6 +7,8 @@ from app.video import (
     compute_ratio_bucket,
     extract_video_metadata,
     generate_video_id,
+    is_valid_video_id,
+    is_canonical_ratio_filter,
 )
 
 app = FastAPI(title="Valid Assessment Video API", version="1.0.0")
@@ -21,6 +22,21 @@ class UploadResponseItem(BaseModel):
     aspect_ratio: str
     ratio_bucket: str
     filename: str
+
+
+class DeleteResponse(BaseModel):
+    deleted: str
+
+
+def _to_response_item(video: StoredVideo) -> UploadResponseItem:
+    return UploadResponseItem(
+        video_id=video.video_id,
+        width=video.width,
+        height=video.height,
+        aspect_ratio=video.aspect_ratio,
+        ratio_bucket=video.ratio_bucket,
+        filename=video.filename,
+    )
 
 
 @app.get("/health")
@@ -60,43 +76,41 @@ async def upload_videos(
             ) from exc
 
         aspect_ratio = compute_aspect_ratio(width, height)
-        ratio_bucket = compute_ratio_bucket(aspect_ratio)
+        ratio_bucket = compute_ratio_bucket(width, height)
         video_id = generate_video_id(content)
 
-        store.store(
-            StoredVideo(
-                video_id=video_id,
-                filename=upload.filename,
-                width=width,
-                height=height,
-                aspect_ratio=aspect_ratio,
-                ratio_bucket=ratio_bucket,
-                content=content,
-            )
+        video = StoredVideo(
+            video_id=video_id,
+            filename=upload.filename,
+            width=width,
+            height=height,
+            aspect_ratio=aspect_ratio,
+            ratio_bucket=ratio_bucket,
+            content=content,
         )
-
-        results.append(
-            UploadResponseItem(
-                video_id=video_id,
-                width=width,
-                height=height,
-                aspect_ratio=aspect_ratio,
-                ratio_bucket=ratio_bucket,
-                filename=upload.filename,
-            )
-        )
+        store.store(video)
+        results.append(_to_response_item(video))
 
     return results
 
 
-@app.get("/videos/{video_id}")
-def serve_video(video_id: str) -> Response:
-    video = store.get(video_id)
-    if video is None:
+@app.get("/videos", response_model=list[UploadResponseItem])
+def list_videos(
+    ratio: str | None = Query(default=None, description="Filter by ratio bucket"),
+) -> list[UploadResponseItem]:
+    if ratio is not None and not is_canonical_ratio_filter(ratio):
+        raise HTTPException(status_code=404, detail=f"Unknown ratio filter: {ratio}")
+
+    videos = store.list_all()
+    if ratio is not None:
+        videos = [video for video in videos if video.ratio_bucket == ratio]
+
+    return [_to_response_item(video) for video in videos]
+
+
+@app.delete("/videos/{video_id}", response_model=DeleteResponse)
+def delete_video(video_id: str) -> DeleteResponse:
+    if not is_valid_video_id(video_id) or not store.delete(video_id):
         raise HTTPException(status_code=404, detail=f"Video {video_id} not found")
 
-    return Response(
-        content=video.content,
-        media_type="video/mp4",
-        headers={"Content-Disposition": f'inline; filename="{video.filename}"'},
-    )
+    return DeleteResponse(deleted=video_id)

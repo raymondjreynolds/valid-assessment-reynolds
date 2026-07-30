@@ -7,7 +7,8 @@ Python API for receiving MP4 uploads, extracting video metadata, and serving fil
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/upload` | Upload one or more MP4 files (multipart `files` field) |
-| `GET` | `/videos/{video_id}` | Stream the uploaded MP4 |
+| `GET` | `/videos` | List all uploaded videos (optional `?ratio=9:16\|1:1\|4:5\|16:9` filter) |
+| `DELETE` | `/videos/{video_id}` | Delete an uploaded video |
 | `GET` | `/health` | Health check for Render |
 
 ### Upload
