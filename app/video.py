@@ -1,11 +1,11 @@
-import io
-import math
+import struct
 import zlib
-from fractions import Fraction
-
-import av
 
 STANDARD_RATIO_BUCKETS = ("9:16", "1:1", "4:5", "16:9")
+
+_CONTAINER_BOXES = frozenset(
+    {b"moov", b"trak", b"mdia", b"minf", b"stbl", b"edts", b"dinf"}
+)
 
 
 def _gcd(a: int, b: int) -> int:
@@ -29,24 +29,128 @@ def generate_video_id(content: bytes) -> str:
     return f"{zlib.crc32(content) % 100_000_000:08d}"
 
 
+def _read_box_header(data: bytes, offset: int, end: int) -> tuple[int, bytes, int] | None:
+    if offset + 8 > end:
+        return None
+
+    size = struct.unpack_from(">I", data, offset)[0]
+    box_type = data[offset + 4 : offset + 8]
+    header_size = 8
+
+    if size == 1:
+        if offset + 16 > end:
+            return None
+        size = struct.unpack_from(">Q", data, offset + 8)[0]
+        header_size = 16
+    elif size == 0:
+        size = end - offset
+
+    if size < header_size or offset + size > end:
+        return None
+
+    return size, box_type, header_size
+
+
+def _parse_tkhd(data: bytes, content_start: int) -> tuple[int, int]:
+    version = data[content_start]
+    if version == 0:
+        width_offset = content_start + 76
+        height_offset = content_start + 80
+    elif version == 1:
+        width_offset = content_start + 88
+        height_offset = content_start + 92
+    else:
+        raise ValueError(f"Unsupported tkhd version: {version}")
+
+    width = struct.unpack_from(">I", data, width_offset)[0] >> 16
+    height = struct.unpack_from(">I", data, height_offset)[0] >> 16
+
+    if width <= 0 or height <= 0:
+        raise ValueError("Invalid video dimensions in tkhd box")
+
+    return width, height
+
+
+def _find_box(
+    data: bytes, start: int, end: int, target: bytes
+) -> tuple[int, int] | None:
+    offset = start
+    while offset < end:
+        header = _read_box_header(data, offset, end)
+        if header is None:
+            break
+
+        size, box_type, header_size = header
+        content_start = offset + header_size
+        box_end = offset + size
+
+        if box_type == target:
+            return content_start, box_end
+
+        if box_type in _CONTAINER_BOXES:
+            found = _find_box(data, content_start, box_end, target)
+            if found is not None:
+                return found
+
+        offset = box_end
+
+    return None
+
+
+def _trak_is_video(data: bytes, trak_start: int, trak_end: int) -> bool:
+    hdlr = _find_box(data, trak_start, trak_end, b"hdlr")
+    if hdlr is None:
+        return False
+
+    content_start, _ = hdlr
+    if content_start + 12 > len(data):
+        return False
+
+    handler_type = data[content_start + 8 : content_start + 12]
+    return handler_type == b"vide"
+
+
+def _find_video_dimensions(data: bytes) -> tuple[int, int]:
+    offset = 0
+    end = len(data)
+
+    while offset < end:
+        header = _read_box_header(data, offset, end)
+        if header is None:
+            break
+
+        size, box_type, header_size = header
+        content_start = offset + header_size
+        box_end = offset + size
+
+        if box_type == b"moov":
+            trak_offset = content_start
+            while trak_offset < box_end:
+                trak_header = _read_box_header(data, trak_offset, box_end)
+                if trak_header is None:
+                    break
+
+                trak_size, trak_type, trak_header_size = trak_header
+                trak_content = trak_offset + trak_header_size
+                trak_end = trak_offset + trak_size
+
+                if trak_type == b"trak" and _trak_is_video(data, trak_content, trak_end):
+                    tkhd = _find_box(data, trak_content, trak_end, b"tkhd")
+                    if tkhd is None:
+                        raise ValueError("Video track is missing tkhd box")
+
+                    tkhd_start, _ = tkhd
+                    return _parse_tkhd(data, tkhd_start)
+
+                trak_offset = trak_end
+
+        offset = box_end
+
+    raise ValueError("No video stream found in file")
+
+
 def extract_video_metadata(content: bytes) -> tuple[int, int]:
-    with av.open(io.BytesIO(content)) as container:
-        video_stream = next(
-            (s for s in container.streams if s.type == "video"), None
-        )
-        if video_stream is None:
-            raise ValueError("No video stream found in file")
+    if len(content) < 8 or content[4:8] != b"ftyp":
+        raise ValueError("File is not a valid MP4")
 
-        width = video_stream.width
-        height = video_stream.height
-
-        if width is None or height is None:
-            raise ValueError("Could not determine video dimensions")
-
-        # Some codecs store display aspect ratio separately from coded size.
-        if video_stream.sample_aspect_ratio is not None:
-            sar = float(Fraction(video_stream.sample_aspect_ratio))
-            if not math.isclose(sar, 1.0):
-                width = int(round(width * sar))
-
-        return width, height
+    return _find_video_dimensions(content)
