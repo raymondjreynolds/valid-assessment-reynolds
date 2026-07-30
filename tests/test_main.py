@@ -209,8 +209,9 @@ def test_match_endpoint_returns_cross_bucket_matches(monkeypatch):
     payload = response.json()
     assert len(payload) == 1
     assert payload[0]["video_id"] == "22222222"
-    assert payload[0]["ratio_bucket"] == "16:9"
-    assert payload[0]["method"] == "dinov2"
+    assert payload[0]["filename"] == "match.mp4"
+    assert "confidence" in payload[0]
+    assert set(payload[0]) == {"video_id", "filename", "confidence"}
 
 
 def test_match_returns_processing_when_fingerprints_pending(monkeypatch):

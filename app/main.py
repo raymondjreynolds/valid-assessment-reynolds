@@ -54,11 +54,8 @@ class DeleteResponse(BaseModel):
 
 class MatchResponseItem(BaseModel):
     video_id: str
-    ratio_bucket: str
+    filename: str
     confidence: float
-    matched_frame_ratio: float
-    alignment: str
-    method: str
 
 
 class MatchProcessingResponse(BaseModel):
@@ -85,11 +82,8 @@ def _to_response_item(video: StoredVideo) -> UploadResponseItem:
 def _to_match_response(match: MatchResult) -> MatchResponseItem:
     return MatchResponseItem(
         video_id=match.video_id,
-        ratio_bucket=match.ratio_bucket,
+        filename=match.filename,
         confidence=match.confidence,
-        matched_frame_ratio=match.matched_frame_ratio,
-        alignment=match.alignment,
-        method=match.method,
     )
 
 

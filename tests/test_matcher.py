@@ -51,8 +51,8 @@ def test_matcher_returns_cross_bucket_matches_only():
 
     assert len(matches) == 1
     assert matches[0].video_id == "33333333"
-    assert matches[0].ratio_bucket == "16:9"
-    assert matches[0].method == "dinov2"
+    assert matches[0].filename == "33333333.mp4"
+    assert matches[0].confidence > 0
 
 
 def test_matcher_unknown_video_raises_key_error():

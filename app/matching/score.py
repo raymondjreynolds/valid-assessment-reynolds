@@ -8,11 +8,8 @@ from app.storage import StoredVideo
 @dataclass(frozen=True)
 class MatchResult:
     video_id: str
-    ratio_bucket: str
+    filename: str
     confidence: float
-    matched_frame_ratio: float
-    alignment: str
-    method: str = "vpdq"
 
 
 def score_match(query: StoredVideo, candidate: StoredVideo) -> MatchResult | None:
@@ -43,9 +40,6 @@ def score_match(query: StoredVideo, candidate: StoredVideo) -> MatchResult | Non
 
     return MatchResult(
         video_id=candidate.video_id,
-        ratio_bucket=candidate.ratio_bucket,
+        filename=candidate.filename,
         confidence=round(alignment.confidence, 4),
-        matched_frame_ratio=round(alignment.matched_frame_ratio, 4),
-        alignment=alignment.alignment,
-        method=method,
     )
