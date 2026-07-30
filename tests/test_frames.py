@@ -1,6 +1,15 @@
 from PIL import Image
 
-from app.frames import SampledFrame, _subsample_frames, letterbox_to_square, plan_frame_sampling
+from app.frames import (
+    SampledFrame,
+    _filter_dark_frames,
+    _subsample_frames,
+    crop_to_content,
+    is_dark_frame,
+    letterbox_to_square,
+    plan_frame_sampling,
+    prepare_frame_for_hashing,
+)
 
 
 def test_plan_frame_sampling_scales_with_duration():
@@ -13,6 +22,36 @@ def test_plan_frame_sampling_scales_with_duration():
 
 def test_plan_frame_sampling_enforces_minimum_for_short_clips():
     assert plan_frame_sampling(2) == (1.0, 4)
+
+
+def test_crop_to_content_trims_black_borders():
+    framed = Image.new("RGB", (200, 100), color=(0, 0, 0))
+    framed.paste(Image.new("RGB", (80, 60), color=(255, 255, 255)), (60, 20))
+
+    cropped = crop_to_content(framed)
+
+    assert cropped.size == (80, 60)
+
+
+def test_prepare_frame_for_hashing_uses_content_crop_and_letterbox():
+    framed = Image.new("RGB", (200, 100), color=(0, 0, 0))
+    framed.paste(Image.new("RGB", (80, 60), color=(255, 0, 0)), (60, 20))
+
+    prepared = prepare_frame_for_hashing(framed)
+
+    assert prepared.size == (384, 384)
+    assert not is_dark_frame(prepared)
+
+
+def test_filter_dark_frames_keeps_bright_frames_when_available():
+    bright = SampledFrame(timestamp=0.0, image=Image.new("RGB", (8, 8), color=(200, 200, 200)))
+    dark = SampledFrame(timestamp=1.0, image=Image.new("RGB", (8, 8), color=(0, 0, 0)))
+    frames = [dark, bright, bright, bright, bright]
+
+    filtered = _filter_dark_frames(frames)
+
+    assert dark not in filtered
+    assert len(filtered) == 4
 
 
 def test_letterbox_to_square_produces_fixed_canvas():

@@ -99,9 +99,17 @@ def align_vpdq_fingerprints_fallback(
     matched_count = sum(
         1 for _, distance in best_matches if distance <= hamming_threshold
     )
-    mean_similarity = sum(similarity for similarity, _ in best_matches) / len(
-        best_matches
-    )
+    passing_similarities = [
+        similarity
+        for similarity, distance in best_matches
+        if distance <= hamming_threshold
+    ]
+    if passing_similarities:
+        mean_similarity = sum(passing_similarities) / len(passing_similarities)
+    else:
+        mean_similarity = sum(similarity for similarity, _ in best_matches) / len(
+            best_matches
+        )
     matched_frame_ratio = matched_count / len(query_frames)
     confidence = mean_similarity * matched_frame_ratio
 

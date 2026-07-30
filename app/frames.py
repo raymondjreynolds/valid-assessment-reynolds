@@ -8,6 +8,9 @@ import numpy as np
 from PIL import Image
 
 from app.config import (
+    CONTENT_CROP_THRESHOLD,
+    DARK_FRAME_THRESHOLD,
+    FFMPEG_FRAME_QUALITY,
     FRAME_SAMPLE_FPS,
     FRAME_SCALE_WIDTH,
     LETTERBOX_SIZE,
@@ -21,6 +24,26 @@ class SampledFrame:
     image: Image.Image
 
 
+def crop_to_content(
+    image: Image.Image,
+    threshold: int = CONTENT_CROP_THRESHOLD,
+) -> Image.Image:
+    """Trim uniform black borders before letterboxing."""
+    rgb = image.convert("RGB")
+    grayscale = np.asarray(rgb.convert("L"))
+    content_mask = grayscale > threshold
+    if not content_mask.any():
+        return rgb
+
+    rows = np.where(content_mask.any(axis=1))[0]
+    columns = np.where(content_mask.any(axis=0))[0]
+    left = int(columns[0])
+    right = int(columns[-1]) + 1
+    top = int(rows[0])
+    bottom = int(rows[-1]) + 1
+    return rgb.crop((left, top, right, bottom))
+
+
 def letterbox_to_square(
     image: Image.Image,
     size: int = LETTERBOX_SIZE,
@@ -31,12 +54,24 @@ def letterbox_to_square(
     scale = min(size / width, size / height)
     new_width = max(1, int(width * scale))
     new_height = max(1, int(height * scale))
-    resized = rgb.resize((new_width, new_height), Image.Resampling.BILINEAR)
+    resized = rgb.resize((new_width, new_height), Image.Resampling.LANCZOS)
     canvas = Image.new("RGB", (size, size), (0, 0, 0))
     left = (size - new_width) // 2
     top = (size - new_height) // 2
     canvas.paste(resized, (left, top))
     return canvas
+
+
+def prepare_frame_for_hashing(image: Image.Image) -> Image.Image:
+    return letterbox_to_square(crop_to_content(image))
+
+
+def is_dark_frame(
+    image: Image.Image,
+    threshold: float = DARK_FRAME_THRESHOLD,
+) -> bool:
+    grayscale = np.asarray(image.convert("L"), dtype=np.float32)
+    return float(grayscale.mean()) < threshold
 
 
 MIN_SAMPLE_FRAMES = 4
@@ -72,6 +107,13 @@ def _subsample_frames(frames: list[SampledFrame], max_frames: int) -> list[Sampl
     return [frames[index] for index in indices]
 
 
+def _filter_dark_frames(frames: list[SampledFrame]) -> list[SampledFrame]:
+    bright_frames = [frame for frame in frames if not is_dark_frame(frame.image)]
+    if len(bright_frames) >= MIN_SAMPLE_FRAMES:
+        return bright_frames
+    return frames
+
+
 def sample_frames(
     content: bytes,
     fps: float | None = None,
@@ -103,7 +145,6 @@ def sample_frames(
         frames_dir.mkdir()
         video_path.write_bytes(content)
 
-        # Downscale during decode to reduce ffmpeg + PIL + inference cost.
         filter_chain = f"fps={fps},scale={FRAME_SCALE_WIDTH}:-2"
         output_pattern = str(frames_dir / "frame_%04d.jpg")
         command = [
@@ -116,7 +157,7 @@ def sample_frames(
             "-vf",
             filter_chain,
             "-qscale:v",
-            "4",
+            str(FFMPEG_FRAME_QUALITY),
             output_pattern,
         ]
         result = subprocess.run(command, capture_output=True, text=True, check=False)
@@ -130,7 +171,7 @@ def sample_frames(
         sampled: list[SampledFrame] = []
         for index, frame_path in enumerate(frame_paths):
             with Image.open(frame_path) as image:
-                normalized = letterbox_to_square(image)
+                normalized = prepare_frame_for_hashing(image)
                 sampled.append(
                     SampledFrame(
                         timestamp=index / fps,
@@ -138,9 +179,5 @@ def sample_frames(
                     )
                 )
 
+        sampled = _filter_dark_frames(sampled)
         return _subsample_frames(sampled, max_frames)
-
-
-def is_dark_frame(image: Image.Image, threshold: float = 12.0) -> bool:
-    grayscale = np.asarray(image.convert("L"), dtype=np.float32)
-    return float(grayscale.mean()) < threshold

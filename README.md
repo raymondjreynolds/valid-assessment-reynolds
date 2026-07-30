@@ -86,11 +86,15 @@ Optional environment variables:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `FINGERPRINT_METHOD` | `vpdq` | `vpdq` (fast, Render default) or `dinov2` (accurate, needs PyTorch) |
-| `VPDQ_HAMMING_THRESHOLD` | `45` | Max PDQ Hamming distance for frame match |
+| `VPDQ_HAMMING_THRESHOLD` | `50` | Max PDQ Hamming distance for frame match |
 | `FRAME_SAMPLE_FPS` | `1` | Fallback sample rate when duration is unavailable |
 | `MAX_FRAMES` | `24` | Fallback frame cap for clips longer than 60 seconds |
-| `FRAME_SCALE_WIDTH` | `256` | Downscale width during ffmpeg extraction |
-| `LETTERBOX_SIZE` | `256` | Square canvas size after letterbox normalization |
+| `FRAME_SCALE_WIDTH` | `384` | Downscale width during ffmpeg extraction |
+| `LETTERBOX_SIZE` | `384` | Square canvas size after content crop + letterbox |
+| `CONTENT_CROP_THRESHOLD` | `8` | Luminance threshold for trimming black borders |
+| `DARK_FRAME_THRESHOLD` | `12` | Skip sampled frames with mean luminance below this |
+| `FFMPEG_FRAME_QUALITY` | `2` | ffmpeg `-qscale:v` for extracted frames (lower is sharper) |
+| `MIN_PDQ_QUALITY` | `50` | Skip low-quality PDQ hashes once enough frames are kept |
 | `FRAME_SIMILARITY_THRESHOLD` | `0.75` | Minimum cosine similarity for DINOv2 frame pairs |
 | `MIN_ALIGNED_FRAMES` | `2` | Minimum temporally aligned frames required |
 | `FINGERPRINT_TIMEOUT_SECONDS` | `600` | Max seconds to wait for background fingerprinting |

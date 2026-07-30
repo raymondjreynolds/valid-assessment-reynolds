@@ -15,7 +15,13 @@ services:
         value: "1"
       - key: MAX_FRAMES
         value: "24"
+      - key: FRAME_SCALE_WIDTH
+        value: "384"
+      - key: LETTERBOX_SIZE
+        value: "384"
       - key: VPDQ_HAMMING_THRESHOLD
-        value: "45"
+        value: "50"
       - key: MIN_ALIGNED_FRAMES
+        value: "2"
+      - key: FFMPEG_FRAME_QUALITY
         value: "2"
