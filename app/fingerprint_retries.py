@@ -1,3 +1,5 @@
+"""Retry policy for failed or timed-out fingerprint jobs."""
+
 from app.config import (
     FINGERPRINT_MAX_RETRIES,
     FINGERPRINT_RETRY_COOLDOWN_SECONDS,
@@ -10,6 +12,7 @@ from app.video import is_matchable_ratio_bucket
 
 
 def can_retry_fingerprint(video: StoredVideo) -> bool:
+    """Return True when another fingerprint attempt is allowed."""
     if video.fingerprint_attempt >= FINGERPRINT_MAX_RETRIES:
         return False
     if video.fingerprint_last_attempt_at is None:
@@ -24,6 +27,11 @@ def schedule_fingerprint_retry(
     *,
     force: bool = False,
 ) -> bool:
+    """Re-queue fingerprinting for a failed or timed-out video.
+
+    When ``force`` is True (e.g. duplicate upload), the cooldown is bypassed
+    but ``FINGERPRINT_MAX_RETRIES`` is still enforced.
+    """
     video = store.get(video_id)
     if video is None:
         return False
@@ -43,7 +51,11 @@ def schedule_fingerprint_retry(
 
 
 def maybe_retry_failed_candidates(query: StoredVideo, store: VideoStore) -> None:
-    """Best-effort background retries for failed cross-bucket candidates."""
+    """Best-effort background retries for failed cross-bucket candidates.
+
+    Does not block matching; eligible candidates may become ready on a later
+    request after cooldown.
+    """
     for video in store.list_all():
         if video.video_id == query.video_id:
             continue

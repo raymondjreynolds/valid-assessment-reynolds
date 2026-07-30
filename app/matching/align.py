@@ -1,3 +1,5 @@
+"""Temporal alignment and confidence scoring for DINOv2 embeddings."""
+
 from dataclasses import dataclass
 
 import numpy as np
@@ -8,6 +10,8 @@ from app.fingerprints.base import FrameFingerprint
 
 @dataclass(frozen=True)
 class AlignmentResult:
+    """Alignment quality metrics shared by vPDQ and embedding matchers."""
+
     confidence: float
     matched_frame_ratio: float
     alignment: str
@@ -48,6 +52,10 @@ def align_fingerprints(
     similarity_threshold: float = FRAME_SIMILARITY_THRESHOLD,
     min_aligned_frames: int = MIN_ALIGNED_FRAMES,
 ) -> AlignmentResult | None:
+    """Align DINOv2 frame pairs with RANSAC on timestamp offsets.
+
+    Confidence is ``matched_frame_ratio * mean_cosine_similarity`` over inliers.
+    """
     if not query_frames or not candidate_frames:
         return None
 

@@ -1,3 +1,5 @@
+"""Cross-bucket video matching orchestration."""
+
 from app.fingerprint_readiness import ensure_query_fingerprint_ready
 from app.fingerprint_retries import maybe_retry_failed_candidates
 from app.matching.prefilter import CandidatePrefilter, NoOpPrefilter
@@ -7,6 +9,8 @@ from app.video import is_matchable_ratio_bucket
 
 
 class VideoMatcher:
+    """Find visually similar videos in different aspect-ratio buckets."""
+
     def __init__(
         self,
         store: VideoStore,
@@ -16,6 +20,7 @@ class VideoMatcher:
         self._prefilter = prefilter or NoOpPrefilter()
 
     def get_cross_bucket_candidates(self, query: StoredVideo) -> list[StoredVideo]:
+        """Return ready, fingerprinted videos in a different ratio bucket than the query."""
         if not is_matchable_ratio_bucket(query.ratio_bucket):
             return []
 
@@ -30,6 +35,11 @@ class VideoMatcher:
         ]
 
     def match(self, video_id: str) -> list[MatchResult]:
+        """Score cross-bucket candidates and return matches above the confidence threshold.
+
+        Results are sorted by confidence descending. Pending or failed unrelated
+        uploads are ignored; only the query video can block with 202/503.
+        """
         query = self._store.get(video_id)
         if query is None:
             raise KeyError(f"Video {video_id} not found")
@@ -51,4 +61,5 @@ class VideoMatcher:
 
 
 def default_matcher(store: VideoStore) -> VideoMatcher:
+    """Construct the production matcher with no candidate prefilter."""
     return VideoMatcher(store=store, prefilter=NoOpPrefilter())

@@ -1,3 +1,5 @@
+"""FastAPI application for video upload, listing, and cross-bucket matching."""
+
 import threading
 from typing import Literal
 
@@ -26,6 +28,7 @@ from app.video import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Warm optional models on startup and stop background workers on shutdown."""
     if PRELOAD_DINOV2 and FINGERPRINT_METHOD == "dinov2":
         from app.fingerprints.dinov2 import preload_dinov2
 
@@ -69,6 +72,7 @@ class MatchErrorResponse(BaseModel):
 
 
 def _to_response_item(video: StoredVideo) -> UploadResponseItem:
+    """Map stored video metadata to the upload/list response shape."""
     return UploadResponseItem(
         video_id=video.video_id,
         width=video.width,
@@ -80,6 +84,7 @@ def _to_response_item(video: StoredVideo) -> UploadResponseItem:
 
 
 def _to_match_response(match: MatchResult) -> MatchResponseItem:
+    """Map an internal match result to the public API response shape."""
     return MatchResponseItem(
         video_id=match.video_id,
         filename=match.filename,
@@ -89,6 +94,7 @@ def _to_match_response(match: MatchResult) -> MatchResponseItem:
 
 @app.get("/health")
 def health() -> dict[str, str]:
+    """Liveness probe for Render and other orchestrators."""
     return {"status": "ok"}
 
 
@@ -96,6 +102,11 @@ def health() -> dict[str, str]:
 async def upload_videos(
     files: list[UploadFile] = File(...),
 ) -> list[UploadResponseItem]:
+    """Accept one or more MP4 uploads and queue background fingerprint jobs.
+
+    Duplicate content (same CRC32 ``video_id``) returns the existing record.
+    Failed or timed-out duplicates trigger an immediate retry when allowed.
+    """
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
 
@@ -129,6 +140,7 @@ async def upload_videos(
 
         existing = store.get(video_id)
         if existing is not None:
+            # Same content: return in-flight or ready videos without duplicating work.
             if existing.fingerprint_status.is_ready():
                 results.append(_to_response_item(existing))
                 continue
@@ -168,6 +180,7 @@ async def upload_videos(
 def list_videos(
     ratio: str | None = Query(default=None, description="Filter by ratio bucket"),
 ) -> list[UploadResponseItem]:
+    """List uploaded videos, optionally filtered to one canonical ratio bucket."""
     if ratio is not None and not is_canonical_ratio_filter(ratio):
         raise HTTPException(status_code=404, detail=f"Unknown ratio filter: {ratio}")
 
@@ -189,6 +202,12 @@ def list_videos(
 def match_videos(
     video_id: str = Query(..., description="Query video id"),
 ):
+    """Return cross-bucket visual matches ranked by confidence.
+
+    Returns HTTP 202 while the query fingerprint is processing (including after
+    an automatic retry), and HTTP 503 when fingerprinting failed or timed out
+    with no retries remaining.
+    """
     if not is_valid_video_id(video_id):
         raise HTTPException(status_code=404, detail=f"Video {video_id} not found")
 
@@ -216,6 +235,7 @@ def match_videos(
 
 @app.delete("/videos/{video_id}", response_model=DeleteResponse)
 def delete_video(video_id: str) -> DeleteResponse:
+    """Delete one uploaded video and its fingerprints from memory."""
     if not is_valid_video_id(video_id) or not store.delete(video_id):
         raise HTTPException(status_code=404, detail=f"Video {video_id} not found")
 

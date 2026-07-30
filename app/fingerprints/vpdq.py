@@ -1,3 +1,5 @@
+"""Meta PDQ (vPDQ-style) frame fingerprinting."""
+
 import tempfile
 from pathlib import Path
 
@@ -12,6 +14,7 @@ class VPDQFingerprinter:
     """Hash sampled frames with Meta PDQ for fast vPDQ-style matching."""
 
     def fingerprint(self, frames: list[SampledFrame]) -> list[FrameFingerprint]:
+        """Hash each sampled frame and skip low-quality PDQ outputs when possible."""
         if not frames:
             return []
 

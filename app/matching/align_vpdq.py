@@ -1,3 +1,5 @@
+"""Temporal alignment and confidence scoring for vPDQ frame hashes."""
+
 from dataclasses import dataclass
 
 import threatengine
@@ -8,6 +10,8 @@ from app.fingerprints.base import FrameFingerprint
 
 @dataclass(frozen=True)
 class AlignmentResult:
+    """Alignment quality metrics for one query/candidate vPDQ comparison."""
+
     confidence: float
     matched_frame_ratio: float
     alignment: str
@@ -149,6 +153,11 @@ def align_vpdq_fingerprints(
     hamming_threshold: int = VPDQ_HAMMING_THRESHOLD,
     min_aligned_frames: int = MIN_ALIGNED_FRAMES,
 ) -> AlignmentResult | None:
+    """Align vPDQ hashes with RANSAC on timestamp offsets.
+
+    Pairs frames by best Hamming distance under ``hamming_threshold``, then
+    estimates a linear time warp between query and candidate timelines.
+    """
     import numpy as np
 
     if not query_frames or not candidate_frames:

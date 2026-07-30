@@ -1,3 +1,5 @@
+"""Optional candidate prefilters applied before visual scoring."""
+
 from typing import Protocol
 
 from app.storage import StoredVideo

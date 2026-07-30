@@ -1,3 +1,5 @@
+"""Fingerprint extraction pipeline for uploaded videos."""
+
 from app.config import FINGERPRINT_METHOD
 from app.fingerprints.base import FingerprintSet, VideoFingerprinter
 from app.fingerprints.vpdq import VPDQFingerprinter
@@ -6,6 +8,7 @@ from app.storage import StoredVideo
 
 
 def get_fingerprinter(method: str | None = None) -> VideoFingerprinter:
+    """Return the configured fingerprinter implementation."""
     selected = (method or FINGERPRINT_METHOD).lower()
     if selected == "vpdq":
         return VPDQFingerprinter()
@@ -22,6 +25,7 @@ def build_fingerprints(
     fingerprinter: VideoFingerprinter | None = None,
     duration_seconds: float | None = None,
 ) -> FingerprintSet:
+    """Sample frames from MP4 bytes and compute per-frame fingerprints."""
     selected = (method or FINGERPRINT_METHOD).lower()
     fingerprinter = fingerprinter or get_fingerprinter(selected)
     frames = sample_frames(content, duration_seconds=duration_seconds)
@@ -36,6 +40,7 @@ def fingerprint_video(
     method: str | None = None,
     fingerprinter: VideoFingerprinter | None = None,
 ) -> StoredVideo:
+    """Return a copy of ``video`` with freshly computed fingerprints attached."""
     fingerprints = build_fingerprints(
         video.content,
         method=method,

@@ -1,3 +1,5 @@
+"""In-memory storage for uploaded videos, metadata, and fingerprints."""
+
 import threading
 from dataclasses import dataclass, field
 
@@ -8,6 +10,8 @@ from app.fingerprints.base import FingerprintSet
 
 @dataclass
 class StoredVideo:
+    """One uploaded MP4 and its derived fingerprint state."""
+
     video_id: str
     filename: str
     width: int
@@ -26,21 +30,24 @@ class StoredVideo:
 
 
 class VideoStore:
-    """In-memory store for uploaded video files and metadata."""
+    """Thread-safe in-memory store for uploaded video files and metadata."""
 
     def __init__(self) -> None:
         self._videos: dict[str, StoredVideo] = {}
         self._lock = threading.Lock()
 
     def store(self, video: StoredVideo) -> None:
+        """Insert or replace a video keyed by ``video_id``."""
         with self._lock:
             self._videos[video.video_id] = video
 
     def get(self, video_id: str) -> StoredVideo | None:
+        """Return a video by id, or None if it is not stored."""
         with self._lock:
             return self._videos.get(video_id)
 
     def delete(self, video_id: str) -> bool:
+        """Remove a video. Returns True when an entry was deleted."""
         with self._lock:
             if video_id not in self._videos:
                 return False
@@ -48,6 +55,7 @@ class VideoStore:
             return True
 
     def list_all(self) -> list[StoredVideo]:
+        """Return a snapshot of all stored videos."""
         with self._lock:
             return list(self._videos.values())
 
@@ -59,6 +67,7 @@ class VideoStore:
         started_at: float | None = None,
         error: str | None = None,
     ) -> None:
+        """Update fingerprint lifecycle fields for one video."""
         with self._lock:
             video = self._videos.get(video_id)
             if video is None:
@@ -79,6 +88,11 @@ class VideoStore:
         status: FingerprintStatus = FingerprintStatus.READY,
         expected_attempt: int | None = None,
     ) -> bool:
+        """Persist computed fingerprints when the job is still current.
+
+        Returns False when the video was deleted, reached a terminal state,
+        or was superseded by a newer retry attempt.
+        """
         with self._lock:
             video = self._videos.get(video_id)
             if video is None:
@@ -100,6 +114,7 @@ class VideoStore:
             return True
 
     def prepare_fingerprint_retry(self, video_id: str) -> bool:
+        """Reset a failed or timed-out video for another fingerprint attempt."""
         with self._lock:
             video = self._videos.get(video_id)
             if video is None:
@@ -113,6 +128,7 @@ class VideoStore:
             return True
 
     def mark_fingerprint_started(self, video_id: str) -> None:
+        """Initialize attempt tracking when a new upload is queued."""
         with self._lock:
             video = self._videos.get(video_id)
             if video is None:

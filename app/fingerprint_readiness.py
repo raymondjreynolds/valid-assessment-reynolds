@@ -1,3 +1,5 @@
+"""Fingerprint readiness checks for match requests."""
+
 from app.config import FINGERPRINT_TIMEOUT_SECONDS, monotonic_now
 from app.fingerprint_retries import schedule_fingerprint_retry
 from app.fingerprint_status import FingerprintStatus
@@ -7,6 +9,8 @@ PROCESSING_MESSAGE = "Fingerprints are still being computed"
 
 
 class FingerprintNotReadyError(Exception):
+    """Raised when a match request cannot proceed yet."""
+
     def __init__(self, video_id: str, status: FingerprintStatus, message: str) -> None:
         self.video_id = video_id
         self.status = status
@@ -15,12 +19,14 @@ class FingerprintNotReadyError(Exception):
 
 
 def _elapsed_seconds(video: StoredVideo) -> float:
+    """Seconds since the current fingerprint attempt started."""
     if video.fingerprint_started_at is None:
         return 0.0
     return monotonic_now() - video.fingerprint_started_at
 
 
 def _check_video_fingerprint_ready(video: StoredVideo, store: VideoStore) -> None:
+    """Validate one video's fingerprint state, scheduling retries when allowed."""
     if video.fingerprint_status.is_ready():
         return
 
@@ -73,4 +79,9 @@ def _check_video_fingerprint_ready(video: StoredVideo, store: VideoStore) -> Non
 
 
 def ensure_query_fingerprint_ready(query: StoredVideo, store: VideoStore) -> None:
+    """Ensure the query video is ready before scoring cross-bucket matches.
+
+    Only the query video is gated. Unrelated pending or failed uploads do not
+    block matching.
+    """
     _check_video_fingerprint_ready(query, store)

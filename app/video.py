@@ -1,3 +1,5 @@
+"""MP4 metadata parsing, ratio bucketing, and content-derived video IDs."""
+
 import struct
 import zlib
 
@@ -22,11 +24,13 @@ def _gcd(a: int, b: int) -> int:
 
 
 def compute_aspect_ratio(width: int, height: int) -> str:
+    """Return reduced width:height aspect ratio as a string."""
     divisor = _gcd(width, height)
     return f"{width // divisor}:{height // divisor}"
 
 
 def compute_ratio_bucket(width: int, height: int) -> str:
+    """Map dimensions to a canonical ad ratio bucket or ``Other``."""
     ratio = width / height
     for bucket, target in RATIO_BUCKET_TARGETS.items():
         if abs(ratio - target) / target <= RATIO_BUCKET_TOLERANCE:
@@ -35,18 +39,22 @@ def compute_ratio_bucket(width: int, height: int) -> str:
 
 
 def is_canonical_ratio_filter(ratio: str) -> bool:
+    """True when ``ratio`` is a supported ``GET /videos`` filter value."""
     return ratio in CANONICAL_RATIO_BUCKETS
 
 
 def is_matchable_ratio_bucket(ratio_bucket: str) -> bool:
+    """True for buckets eligible as query or candidate in ``GET /match``."""
     return ratio_bucket in CANONICAL_RATIO_BUCKETS
 
 
 def generate_video_id(content: bytes) -> str:
+    """Derive a stable eight-digit id from MP4 file bytes (CRC32)."""
     return f"{zlib.crc32(content) % 100_000_000:08d}"
 
 
 def is_valid_video_id(video_id: str) -> bool:
+    """True when ``video_id`` matches the API's eight-digit numeric format."""
     return len(video_id) == 8 and video_id.isdigit()
 
 
@@ -213,6 +221,7 @@ def _find_movie_duration(data: bytes) -> float:
 
 
 def extract_video_duration(content: bytes) -> float:
+    """Parse clip duration in seconds from MP4 container metadata."""
     if len(content) < 8 or content[4:8] != b"ftyp":
         raise ValueError("File is not a valid MP4")
 
@@ -220,6 +229,7 @@ def extract_video_duration(content: bytes) -> float:
 
 
 def extract_video_metadata(content: bytes) -> tuple[int, int, float]:
+    """Parse width, height, and duration from MP4 container metadata."""
     if len(content) < 8 or content[4:8] != b"ftyp":
         raise ValueError("File is not a valid MP4")
 

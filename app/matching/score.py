@@ -1,3 +1,5 @@
+"""Match confidence scoring for one query/candidate pair."""
+
 from dataclasses import dataclass
 
 from app.config import MATCH_CONFIDENCE_THRESHOLD
@@ -8,12 +10,19 @@ from app.storage import StoredVideo
 
 @dataclass(frozen=True)
 class MatchResult:
+    """Public match payload fields returned by ``GET /match``."""
+
     video_id: str
     filename: str
     confidence: float
 
 
 def score_match(query: StoredVideo, candidate: StoredVideo) -> MatchResult | None:
+    """Align fingerprints and return a match when confidence meets the threshold.
+
+    Uses the query video's fingerprint method. vPDQ tries temporal RANSAC first,
+    then falls back to best per-frame similarity when reframing breaks alignment.
+    """
     if query.fingerprints.is_empty or candidate.fingerprints.is_empty:
         return None
 

@@ -1,3 +1,5 @@
+"""Frame extraction and normalization for video fingerprinting."""
+
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -21,6 +23,8 @@ from app.config import (
 
 @dataclass(frozen=True)
 class SampledFrame:
+    """One decoded video frame with a timestamp in seconds."""
+
     timestamp: float
     image: Image.Image
 
@@ -64,6 +68,7 @@ def letterbox_to_square(
 
 
 def prepare_frame_for_hashing(image: Image.Image) -> Image.Image:
+    """Crop letterboxed content and pad to a square canvas for hashing."""
     return letterbox_to_square(crop_to_content(image))
 
 
@@ -71,6 +76,7 @@ def is_dark_frame(
     image: Image.Image,
     threshold: float = DARK_FRAME_THRESHOLD,
 ) -> bool:
+    """Return True when mean luminance is below the dark-frame threshold."""
     grayscale = np.asarray(image.convert("L"), dtype=np.float32)
     return float(grayscale.mean()) < threshold
 
@@ -101,6 +107,7 @@ def plan_frame_sampling(duration_seconds: float) -> tuple[float, int]:
 
 
 def _subsample_frames(frames: list[SampledFrame], max_frames: int) -> list[SampledFrame]:
+    """Evenly subsample frames down to ``max_frames`` when ffmpeg over-extracts."""
     if len(frames) <= max_frames:
         return frames
 
@@ -109,6 +116,7 @@ def _subsample_frames(frames: list[SampledFrame], max_frames: int) -> list[Sampl
 
 
 def _filter_dark_frames(frames: list[SampledFrame]) -> list[SampledFrame]:
+    """Drop near-black frames when enough brighter frames remain."""
     bright_frames = [frame for frame in frames if not is_dark_frame(frame.image)]
     if len(bright_frames) >= MIN_SAMPLE_FRAMES:
         return bright_frames
@@ -121,6 +129,12 @@ def sample_frames(
     max_frames: int | None = None,
     duration_seconds: float | None = None,
 ) -> list[SampledFrame]:
+    """Extract, normalize, and subsample frames from raw MP4 bytes via ffmpeg.
+
+    Sampling rate and cap follow ``plan_frame_sampling`` when ``fps`` and
+    ``max_frames`` are omitted. Raises ``ValueError`` on ffmpeg failure or
+    timeout.
+    """
     if fps is None or max_frames is None:
         if duration_seconds is None:
             try:
