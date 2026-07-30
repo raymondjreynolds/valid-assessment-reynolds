@@ -8,6 +8,7 @@ Python API for receiving MP4 uploads, extracting video metadata, and serving fil
 |--------|------|-------------|
 | `POST` | `/upload` | Upload one or more MP4 files (multipart `files` field) |
 | `GET` | `/videos` | List all uploaded videos (optional `?ratio=9:16\|1:1\|4:5\|16:9` filter) |
+| `GET` | `/match?video_id=<id>` | Cross-bucket visual matches with confidence scores |
 | `DELETE` | `/videos/{video_id}` | Delete an uploaded video |
 | `GET` | `/health` | Health check for Render |
 
@@ -36,6 +37,52 @@ Response:
 
 Standard `ratio_bucket` values: `9:16`, `1:1`, `4:5`, `16:9`, or `Other`.
 
+### Match
+
+```bash
+curl "https://your-service.onrender.com/match?video_id=59936273"
+```
+
+Response:
+
+```json
+[
+  {
+    "video_id": "63223501",
+    "ratio_bucket": "1:1",
+    "confidence": 0.84,
+    "matched_frame_ratio": 0.68,
+    "alignment": "partial",
+    "method": "dinov2"
+  }
+]
+```
+
+Matching is **cross-bucket only**: a query never matches videos in its own `ratio_bucket`. Uploads return immediately; DINOv2 fingerprinting runs in a background task after upload.
+
+If `/match` is called before fingerprints are ready, the API returns **HTTP 202**:
+
+```json
+{
+  "status": "processing",
+  "message": "Fingerprints are still being computed for video 59936273",
+  "video_id": "59936273"
+}
+```
+
+If fingerprinting fails or exceeds the timeout, the API returns **HTTP 503** with `status` of `failed` or `timed_out`.
+
+Optional environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `FRAME_SAMPLE_FPS` | `1.0` | Frame sampling rate during fingerprinting |
+| `CENTER_CROP_FRACTION` | `0.85` | Center crop applied before embedding |
+| `MATCH_CONFIDENCE_THRESHOLD` | `0.5` | Minimum match confidence to return |
+| `FRAME_SIMILARITY_THRESHOLD` | `0.75` | Minimum cosine similarity for frame pairs |
+| `MIN_ALIGNED_FRAMES` | `3` | Minimum temporally aligned frames required |
+| `FINGERPRINT_TIMEOUT_SECONDS` | `300` | Max seconds to wait for background fingerprinting |
+
 ## Local development
 
 ```bash
@@ -59,4 +106,16 @@ No environment variables are required.
 
 - Only `.mp4` files are accepted.
 - `video_id` is an 8-digit ID derived from the file content (CRC32).
-- Videos and metadata are kept in memory only and are lost on redeploy or restart.
+- Videos, metadata, and DINOv2 fingerprints are kept in memory only and are lost on redeploy or restart.
+- The matching pipeline is pluggable: `NoOpPrefilter` passes all cross-bucket candidates to DINOv2 scoring today; a future vPDQ pre-filter can plug in without changing the API.
+
+## Architecture
+
+```text
+upload → store video + metadata → return response
+       → background task → sample frames → DINOv2 fingerprints
+GET /match → if processing: HTTP 202
+            → if ready: cross-bucket candidates → prefilter → temporal alignment → confidence score
+```
+
+Future vPDQ support is stubbed in `app/fingerprints/vpdq.py` and `app/matching/prefilter.py`.

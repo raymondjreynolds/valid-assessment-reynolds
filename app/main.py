@@ -1,18 +1,28 @@
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from typing import Literal
+
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Query, UploadFile
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from app.config import monotonic_now
+from app.fingerprint_jobs import schedule_fingerprint_job
+from app.fingerprint_readiness import FingerprintNotReadyError
+from app.fingerprint_status import FingerprintStatus
+from app.matching import MatchResult, VideoMatcher
+from app.matching.matcher import default_matcher
 from app.storage import StoredVideo, VideoStore
 from app.video import (
     compute_aspect_ratio,
     compute_ratio_bucket,
     extract_video_metadata,
     generate_video_id,
-    is_valid_video_id,
     is_canonical_ratio_filter,
+    is_valid_video_id,
 )
 
 app = FastAPI(title="Valid Assessment Video API", version="1.0.0")
 store = VideoStore()
+matcher = default_matcher(store)
 
 
 class UploadResponseItem(BaseModel):
@@ -28,6 +38,27 @@ class DeleteResponse(BaseModel):
     deleted: str
 
 
+class MatchResponseItem(BaseModel):
+    video_id: str
+    ratio_bucket: str
+    confidence: float
+    matched_frame_ratio: float
+    alignment: str
+    method: str
+
+
+class MatchProcessingResponse(BaseModel):
+    status: Literal["processing"]
+    message: str
+    video_id: str
+
+
+class MatchErrorResponse(BaseModel):
+    status: Literal["failed", "timed_out"]
+    message: str
+    video_id: str
+
+
 def _to_response_item(video: StoredVideo) -> UploadResponseItem:
     return UploadResponseItem(
         video_id=video.video_id,
@@ -39,6 +70,17 @@ def _to_response_item(video: StoredVideo) -> UploadResponseItem:
     )
 
 
+def _to_match_response(match: MatchResult) -> MatchResponseItem:
+    return MatchResponseItem(
+        video_id=match.video_id,
+        ratio_bucket=match.ratio_bucket,
+        confidence=match.confidence,
+        matched_frame_ratio=match.matched_frame_ratio,
+        alignment=match.alignment,
+        method=match.method,
+    )
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -46,6 +88,7 @@ def health() -> dict[str, str]:
 
 @app.post("/upload", response_model=list[UploadResponseItem])
 async def upload_videos(
+    background_tasks: BackgroundTasks,
     files: list[UploadFile] = File(...),
 ) -> list[UploadResponseItem]:
     if not files:
@@ -87,8 +130,11 @@ async def upload_videos(
             aspect_ratio=aspect_ratio,
             ratio_bucket=ratio_bucket,
             content=content,
+            fingerprint_status=FingerprintStatus.PENDING,
+            fingerprint_started_at=monotonic_now(),
         )
         store.store(video)
+        background_tasks.add_task(schedule_fingerprint_job, video_id, store)
         results.append(_to_response_item(video))
 
     return results
@@ -106,6 +152,44 @@ def list_videos(
         videos = [video for video in videos if video.ratio_bucket == ratio]
 
     return [_to_response_item(video) for video in videos]
+
+
+@app.get(
+    "/match",
+    responses={
+        200: {"model": list[MatchResponseItem]},
+        202: {"model": MatchProcessingResponse},
+        503: {"model": MatchErrorResponse},
+    },
+)
+def match_videos(
+    video_id: str = Query(..., description="Query video id"),
+):
+    if not is_valid_video_id(video_id):
+        raise HTTPException(status_code=404, detail=f"Video {video_id} not found")
+
+    try:
+        matches = matcher.match(video_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except FingerprintNotReadyError as exc:
+        if exc.status.is_in_progress():
+            payload = MatchProcessingResponse(
+                status="processing",
+                message=exc.message,
+                video_id=exc.video_id,
+            )
+            return JSONResponse(status_code=202, content=payload.model_dump())
+
+        status = "timed_out" if exc.status is FingerprintStatus.TIMED_OUT else "failed"
+        payload = MatchErrorResponse(
+            status=status,
+            message=exc.message,
+            video_id=exc.video_id,
+        )
+        return JSONResponse(status_code=503, content=payload.model_dump())
+
+    return [_to_match_response(match) for match in matches]
 
 
 @app.delete("/videos/{video_id}", response_model=DeleteResponse)
