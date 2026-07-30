@@ -7,7 +7,7 @@ from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from app.config import FINGERPRINT_METHOD, PRELOAD_DINOV2, monotonic_now
+from app.config import FINGERPRINT_METHOD, PRELOAD_DINOV2
 from app.fingerprint_jobs import schedule_fingerprint_job, shutdown_fingerprint_executor
 from app.fingerprint_readiness import FingerprintNotReadyError
 from app.fingerprint_status import FingerprintStatus
@@ -127,6 +127,25 @@ async def upload_videos(
         ratio_bucket = compute_ratio_bucket(width, height)
         video_id = generate_video_id(content)
 
+        existing = store.get(video_id)
+        if existing is not None:
+            if existing.fingerprint_status.is_ready():
+                results.append(_to_response_item(existing))
+                continue
+            if existing.fingerprint_status.is_in_progress():
+                results.append(_to_response_item(existing))
+                continue
+
+            from app.fingerprint_retries import schedule_fingerprint_retry
+
+            if schedule_fingerprint_retry(video_id, store, force=True):
+                refreshed = store.get(video_id)
+                if refreshed is not None:
+                    results.append(_to_response_item(refreshed))
+                    continue
+            results.append(_to_response_item(existing))
+            continue
+
         video = StoredVideo(
             video_id=video_id,
             filename=upload.filename,
@@ -136,10 +155,9 @@ async def upload_videos(
             ratio_bucket=ratio_bucket,
             content=content,
             duration_seconds=duration_seconds,
-            fingerprint_status=FingerprintStatus.PENDING,
-            fingerprint_started_at=monotonic_now(),
         )
         store.store(video)
+        store.mark_fingerprint_started(video_id)
         schedule_fingerprint_job(video_id, store)
         results.append(_to_response_item(video))
 

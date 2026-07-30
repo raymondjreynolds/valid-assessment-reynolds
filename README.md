@@ -101,6 +101,9 @@ Optional environment variables:
 | `FRAME_SIMILARITY_THRESHOLD` | `0.75` | Minimum cosine similarity for DINOv2 frame pairs |
 | `MIN_ALIGNED_FRAMES` | `2` | Minimum temporally aligned frames required |
 | `FINGERPRINT_TIMEOUT_SECONDS` | `600` | Max seconds to wait for background fingerprinting |
+| `FFMPEG_TIMEOUT_SECONDS` | `120` | Max seconds for ffmpeg frame extraction |
+| `FINGERPRINT_RETRY_COOLDOWN_SECONDS` | `60` | Minimum wait before auto-retrying failed fingerprints |
+| `FINGERPRINT_MAX_RETRIES` | `3` | Maximum fingerprint attempts per video |
 | `PRELOAD_DINOV2` | `false` | Warm-load DINOv2 on startup when using `dinov2` |
 | `TORCH_NUM_THREADS` | `2` | CPU threads used by PyTorch when using `dinov2` |
 

@@ -1,4 +1,5 @@
 from app.config import FINGERPRINT_TIMEOUT_SECONDS, monotonic_now
+from app.fingerprint_retries import schedule_fingerprint_retry
 from app.fingerprint_status import FingerprintStatus
 from app.storage import StoredVideo, VideoStore
 
@@ -23,11 +24,25 @@ def _check_video_fingerprint_ready(video: StoredVideo, store: VideoStore) -> Non
     if video.fingerprint_status.is_ready():
         return
 
-    if video.fingerprint_status is FingerprintStatus.FAILED:
+    if video.fingerprint_status in {
+        FingerprintStatus.FAILED,
+        FingerprintStatus.TIMED_OUT,
+    }:
+        if schedule_fingerprint_retry(video.video_id, store):
+            raise FingerprintNotReadyError(
+                video.video_id,
+                FingerprintStatus.PENDING,
+                PROCESSING_MESSAGE,
+            )
         raise FingerprintNotReadyError(
             video.video_id,
             video.fingerprint_status,
-            video.fingerprint_error or "Fingerprinting failed",
+            video.fingerprint_error
+            or (
+                "Fingerprinting failed"
+                if video.fingerprint_status is FingerprintStatus.FAILED
+                else f"Fingerprinting timed out after {FINGERPRINT_TIMEOUT_SECONDS} seconds"
+            ),
         )
 
     if video.fingerprint_status.is_in_progress():
@@ -38,6 +53,12 @@ def _check_video_fingerprint_ready(video: StoredVideo, store: VideoStore) -> Non
                 FingerprintStatus.TIMED_OUT,
                 error="Fingerprinting timed out",
             )
+            if schedule_fingerprint_retry(video.video_id, store):
+                raise FingerprintNotReadyError(
+                    video.video_id,
+                    FingerprintStatus.PENDING,
+                    PROCESSING_MESSAGE,
+                )
             raise FingerprintNotReadyError(
                 video.video_id,
                 FingerprintStatus.TIMED_OUT,
@@ -50,19 +71,6 @@ def _check_video_fingerprint_ready(video: StoredVideo, store: VideoStore) -> Non
             PROCESSING_MESSAGE,
         )
 
-    if video.fingerprint_status is FingerprintStatus.TIMED_OUT:
-        raise FingerprintNotReadyError(
-            video.video_id,
-            video.fingerprint_status,
-            video.fingerprint_error
-            or f"Fingerprinting timed out after {FINGERPRINT_TIMEOUT_SECONDS} seconds",
-        )
 
-
-def ensure_fingerprint_ready(video: StoredVideo, store: VideoStore) -> None:
-    _check_video_fingerprint_ready(video, store)
-
-
-def ensure_all_fingerprints_ready(store: VideoStore) -> None:
-    for video in store.list_all():
-        _check_video_fingerprint_ready(video, store)
+def ensure_query_fingerprint_ready(query: StoredVideo, store: VideoStore) -> None:
+    _check_video_fingerprint_ready(query, store)

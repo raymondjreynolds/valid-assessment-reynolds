@@ -1,6 +1,7 @@
 import threading
 from dataclasses import dataclass, field
 
+from app.config import monotonic_now
 from app.fingerprint_status import FingerprintStatus
 from app.fingerprints.base import FingerprintSet
 
@@ -18,6 +19,8 @@ class StoredVideo:
     fingerprint_method: str = "vpdq"
     fingerprint_status: FingerprintStatus = FingerprintStatus.PENDING
     fingerprint_started_at: float | None = None
+    fingerprint_last_attempt_at: float | None = None
+    fingerprint_attempt: int = 0
     duration_seconds: float | None = None
     fingerprint_error: str | None = None
 
@@ -74,12 +77,49 @@ class VideoStore:
         fingerprints: FingerprintSet,
         *,
         status: FingerprintStatus = FingerprintStatus.READY,
-    ) -> None:
+        expected_attempt: int | None = None,
+    ) -> bool:
+        with self._lock:
+            video = self._videos.get(video_id)
+            if video is None:
+                return False
+            if video.fingerprint_status in {
+                FingerprintStatus.TIMED_OUT,
+                FingerprintStatus.FAILED,
+            }:
+                return False
+            if (
+                expected_attempt is not None
+                and video.fingerprint_attempt != expected_attempt
+            ):
+                return False
+            video.fingerprints = fingerprints
+            video.fingerprint_method = fingerprints.method
+            video.fingerprint_status = status
+            video.fingerprint_error = None
+            return True
+
+    def prepare_fingerprint_retry(self, video_id: str) -> bool:
+        with self._lock:
+            video = self._videos.get(video_id)
+            if video is None:
+                return False
+            now = monotonic_now()
+            video.fingerprint_attempt += 1
+            video.fingerprint_last_attempt_at = now
+            video.fingerprint_started_at = now
+            video.fingerprint_status = FingerprintStatus.PENDING
+            video.fingerprint_error = None
+            return True
+
+    def mark_fingerprint_started(self, video_id: str) -> None:
         with self._lock:
             video = self._videos.get(video_id)
             if video is None:
                 return
-            video.fingerprints = fingerprints
-            video.fingerprint_method = fingerprints.method
-            video.fingerprint_status = status
+            now = monotonic_now()
+            video.fingerprint_status = FingerprintStatus.PENDING
+            video.fingerprint_attempt = 1
+            video.fingerprint_last_attempt_at = now
+            video.fingerprint_started_at = now
             video.fingerprint_error = None

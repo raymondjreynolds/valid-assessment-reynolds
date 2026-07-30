@@ -12,6 +12,13 @@ def run_fingerprint_job(video_id: str, store: VideoStore) -> None:
     video = store.get(video_id)
     if video is None:
         return
+    if video.fingerprint_status not in {
+        FingerprintStatus.PENDING,
+        FingerprintStatus.PROCESSING,
+    }:
+        return
+
+    attempt = video.fingerprint_attempt
 
     store.set_fingerprint_status(
         video_id,
@@ -32,7 +39,12 @@ def run_fingerprint_job(video_id: str, store: VideoStore) -> None:
         )
         return
 
-    store.update_fingerprints(video_id, fingerprints, status=FingerprintStatus.READY)
+    store.update_fingerprints(
+        video_id,
+        fingerprints,
+        status=FingerprintStatus.READY,
+        expected_attempt=attempt,
+    )
 
 
 def schedule_fingerprint_job(video_id: str, store: VideoStore) -> None:

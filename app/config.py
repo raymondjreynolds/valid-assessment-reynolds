@@ -15,6 +15,11 @@ MIN_ALIGNED_FRAMES = int(os.environ.get("MIN_ALIGNED_FRAMES", "2"))
 VPDQ_HAMMING_THRESHOLD = int(os.environ.get("VPDQ_HAMMING_THRESHOLD", "50"))
 MIN_PDQ_QUALITY = int(os.environ.get("MIN_PDQ_QUALITY", "50"))
 FINGERPRINT_TIMEOUT_SECONDS = int(os.environ.get("FINGERPRINT_TIMEOUT_SECONDS", "600"))
+FFMPEG_TIMEOUT_SECONDS = int(os.environ.get("FFMPEG_TIMEOUT_SECONDS", "120"))
+FINGERPRINT_RETRY_COOLDOWN_SECONDS = int(
+    os.environ.get("FINGERPRINT_RETRY_COOLDOWN_SECONDS", "60")
+)
+FINGERPRINT_MAX_RETRIES = int(os.environ.get("FINGERPRINT_MAX_RETRIES", "3"))
 TORCH_NUM_THREADS = int(os.environ.get("TORCH_NUM_THREADS", "2"))
 PRELOAD_DINOV2 = os.environ.get("PRELOAD_DINOV2", "false").lower() in {"1", "true", "yes"}
 

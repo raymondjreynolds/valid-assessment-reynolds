@@ -1,3 +1,5 @@
+from app.fingerprint_readiness import ensure_query_fingerprint_ready
+from app.fingerprint_retries import maybe_retry_failed_candidates
 from app.matching.prefilter import CandidatePrefilter, NoOpPrefilter
 from app.matching.score import MatchResult, score_match
 from app.storage import StoredVideo, VideoStore
@@ -32,9 +34,8 @@ class VideoMatcher:
         if query is None:
             raise KeyError(f"Video {video_id} not found")
 
-        from app.fingerprint_readiness import ensure_all_fingerprints_ready
-
-        ensure_all_fingerprints_ready(self._store)
+        ensure_query_fingerprint_ready(query, self._store)
+        maybe_retry_failed_candidates(query, self._store)
 
         candidates = self.get_cross_bucket_candidates(query)
         candidates = self._prefilter.prefilter(query, candidates)

@@ -11,6 +11,7 @@ from app.config import (
     CONTENT_CROP_THRESHOLD,
     DARK_FRAME_THRESHOLD,
     FFMPEG_FRAME_QUALITY,
+    FFMPEG_TIMEOUT_SECONDS,
     FRAME_SAMPLE_FPS,
     FRAME_SCALE_WIDTH,
     LETTERBOX_SIZE,
@@ -160,7 +161,18 @@ def sample_frames(
             str(FFMPEG_FRAME_QUALITY),
             output_pattern,
         ]
-        result = subprocess.run(command, capture_output=True, text=True, check=False)
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=FFMPEG_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise ValueError(
+                f"ffmpeg timed out after {FFMPEG_TIMEOUT_SECONDS} seconds"
+            ) from exc
         if result.returncode != 0:
             raise ValueError(result.stderr.strip() or "Failed to extract frames with ffmpeg")
 

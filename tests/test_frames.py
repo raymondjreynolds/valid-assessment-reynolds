@@ -76,3 +76,22 @@ def test_subsample_frames_caps_count():
     assert len(sampled) == 12
     assert sampled[0].timestamp == 0.0
     assert sampled[-1].timestamp == 29.0
+
+
+def test_sample_frames_raises_when_ffmpeg_times_out(monkeypatch):
+    import subprocess
+
+    import app.frames as frames_module
+
+    def _timeout(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(cmd="ffmpeg", timeout=1)
+
+    monkeypatch.setattr(frames_module.imageio_ffmpeg, "get_ffmpeg_exe", lambda: "ffmpeg")
+    monkeypatch.setattr(frames_module.subprocess, "run", _timeout)
+    monkeypatch.setattr(frames_module, "FFMPEG_TIMEOUT_SECONDS", 1)
+
+    try:
+        frames_module.sample_frames(b"video-bytes", fps=1, max_frames=4)
+        assert False, "Expected ValueError"
+    except ValueError as exc:
+        assert "timed out" in str(exc).lower()

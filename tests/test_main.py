@@ -241,7 +241,7 @@ def test_match_returns_processing_when_fingerprints_pending(monkeypatch):
     }
 
 
-def test_match_returns_processing_when_any_video_fingerprint_pending(monkeypatch):
+def test_match_succeeds_when_unrelated_video_fingerprint_pending(monkeypatch):
     store = VideoStore()
     store.store(
         StoredVideo(
@@ -252,33 +252,124 @@ def test_match_returns_processing_when_any_video_fingerprint_pending(monkeypatch
             aspect_ratio="9:16",
             ratio_bucket="9:16",
             content=b"query",
+            fingerprint_method="dinov2",
             fingerprint_status=FingerprintStatus.READY,
-            fingerprints=FingerprintSet(method="vpdq", frames=[]),
+            fingerprints=FingerprintSet(
+                method="dinov2",
+                frames=[
+                    FrameFingerprint(timestamp=0.0, dinov2=[1.0, 0.0]),
+                    FrameFingerprint(timestamp=1.0, dinov2=[1.0, 0.0]),
+                    FrameFingerprint(timestamp=2.0, dinov2=[1.0, 0.0]),
+                ],
+            ),
         )
     )
     store.store(
         StoredVideo(
             video_id="22222222",
-            filename="candidate.mp4",
+            filename="ready.mp4",
             width=1280,
             height=720,
             aspect_ratio="16:9",
             ratio_bucket="16:9",
-            content=b"candidate",
+            content=b"match",
+            fingerprint_method="dinov2",
+            fingerprint_status=FingerprintStatus.READY,
+            fingerprints=FingerprintSet(
+                method="dinov2",
+                frames=[
+                    FrameFingerprint(timestamp=0.5, dinov2=[1.0, 0.0]),
+                    FrameFingerprint(timestamp=1.5, dinov2=[1.0, 0.0]),
+                    FrameFingerprint(timestamp=2.5, dinov2=[1.0, 0.0]),
+                ],
+            ),
+        )
+    )
+    store.store(
+        StoredVideo(
+            video_id="33333333",
+            filename="pending.mp4",
+            width=1080,
+            height=1350,
+            aspect_ratio="4:5",
+            ratio_bucket="4:5",
+            content=b"pending",
             fingerprint_status=FingerprintStatus.PROCESSING,
             fingerprint_started_at=0.0,
         )
     )
     monkeypatch.setattr("app.main.store", store)
     monkeypatch.setattr("app.main.matcher", VideoMatcher(store=store, prefilter=NoOpPrefilter()))
-    monkeypatch.setattr("app.fingerprint_readiness.monotonic_now", lambda: 10.0)
+    monkeypatch.setattr(
+        "app.fingerprint_retries.schedule_fingerprint_job",
+        lambda *_args, **_kwargs: None,
+    )
+
+    response = client.get("/match", params={"video_id": "11111111"})
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload) == 1
+    assert payload[0]["video_id"] == "22222222"
+
+
+def test_match_returns_failed_when_query_fingerprint_failed(monkeypatch):
+    store = VideoStore()
+    store.store(
+        StoredVideo(
+            video_id="11111111",
+            filename="query.mp4",
+            width=576,
+            height=1024,
+            aspect_ratio="9:16",
+            ratio_bucket="9:16",
+            content=b"query",
+            fingerprint_status=FingerprintStatus.FAILED,
+            fingerprint_attempt=3,
+            fingerprint_error="ffmpeg failed",
+        )
+    )
+    monkeypatch.setattr("app.main.store", store)
+    monkeypatch.setattr("app.main.matcher", VideoMatcher(store=store, prefilter=NoOpPrefilter()))
+    monkeypatch.setattr("app.config.FINGERPRINT_MAX_RETRIES", 3)
+    monkeypatch.setattr("app.fingerprint_retries.FINGERPRINT_MAX_RETRIES", 3)
+
+    response = client.get("/match", params={"video_id": "11111111"})
+    assert response.status_code == 503
+    assert response.json() == {
+        "status": "failed",
+        "message": "ffmpeg failed",
+    }
+
+
+def test_match_retries_failed_query_and_returns_processing(monkeypatch):
+    store = VideoStore()
+    store.store(
+        StoredVideo(
+            video_id="11111111",
+            filename="query.mp4",
+            width=576,
+            height=1024,
+            aspect_ratio="9:16",
+            ratio_bucket="9:16",
+            content=b"query",
+            fingerprint_status=FingerprintStatus.FAILED,
+            fingerprint_attempt=1,
+            fingerprint_last_attempt_at=0.0,
+            fingerprint_error="ffmpeg failed",
+        )
+    )
+    monkeypatch.setattr("app.main.store", store)
+    monkeypatch.setattr("app.main.matcher", VideoMatcher(store=store, prefilter=NoOpPrefilter()))
+    monkeypatch.setattr("app.fingerprint_retries.monotonic_now", lambda: 100.0)
+    monkeypatch.setattr("app.fingerprint_retries.schedule_fingerprint_job", lambda *_args: None)
 
     response = client.get("/match", params={"video_id": "11111111"})
     assert response.status_code == 202
-    assert response.json() == {
-        "status": "processing",
-        "message": "Fingerprints are still being computed",
-    }
+    assert response.json()["status"] == "processing"
+    refreshed = store.get("11111111")
+    assert refreshed is not None
+    assert refreshed.fingerprint_status is FingerprintStatus.PENDING
+    assert refreshed.fingerprint_attempt == 2
 
 
 def test_match_returns_timed_out_after_timeout(monkeypatch):
@@ -294,12 +385,15 @@ def test_match_returns_timed_out_after_timeout(monkeypatch):
             content=b"query",
             fingerprint_status=FingerprintStatus.PROCESSING,
             fingerprint_started_at=0.0,
+            fingerprint_attempt=3,
         )
     )
     monkeypatch.setattr("app.main.store", store)
     monkeypatch.setattr("app.main.matcher", VideoMatcher(store=store, prefilter=NoOpPrefilter()))
     monkeypatch.setattr("app.config.FINGERPRINT_TIMEOUT_SECONDS", 60)
     monkeypatch.setattr("app.fingerprint_readiness.FINGERPRINT_TIMEOUT_SECONDS", 60)
+    monkeypatch.setattr("app.config.FINGERPRINT_MAX_RETRIES", 3)
+    monkeypatch.setattr("app.fingerprint_retries.FINGERPRINT_MAX_RETRIES", 3)
     monkeypatch.setattr("app.fingerprint_readiness.monotonic_now", lambda: 100.0)
 
     response = client.get("/match", params={"video_id": "11111111"})
