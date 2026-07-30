@@ -89,7 +89,8 @@ Optional environment variables:
 | `ONNX_MODEL` | `clip` | `clip` (default) or `mobilenet` when using `onnx` |
 | `ONNX_MODEL_CACHE` | `.cache/onnx` | Directory for downloaded ONNX model files |
 | `ONNX_BATCH_SIZE` | `4` | Frames per ONNX inference batch |
-| `PRELOAD_ONNX` | `true` | Warm-load ONNX model on startup when using `onnx` |
+| `PRELOAD_ONNX` | `false` | Warm-load ONNX model on startup (disable on Render free tier) |
+| `RELEASE_VIDEO_CONTENT_AFTER_FINGERPRINT` | `true` | Drop MP4 bytes from memory after fingerprinting completes |
 | `VPDQ_HAMMING_THRESHOLD` | `50` | Max PDQ Hamming distance for frame match |
 | `FRAME_SAMPLE_FPS` | `1` | Fallback sample rate when duration is unavailable |
 | `MAX_FRAMES` | `24` | Fallback frame cap for clips longer than 60 seconds |
@@ -138,7 +139,18 @@ export PRELOAD_ONNX=true
 uvicorn app.main:app --reload
 ```
 
-The CLIP ONNX model is downloaded on first use into `ONNX_MODEL_CACHE` (~300 MB). Use `ONNX_MODEL=mobilenet` for faster startup during experiments.
+The CLIP ONNX model is downloaded on first use into `ONNX_MODEL_CACHE` (~300 MB on disk, ~350+ MB RAM when loaded). **CLIP does not fit Render's free tier (512 MB)** alongside Python and uploaded videos. On Render, use `ONNX_MODEL=mobilenet` (configured in `render.yaml`) or upgrade the instance memory. Use `ONNX_MODEL=clip` locally or on larger instances.
+
+#### Memory on Render free tier
+
+| Component | Approx. RAM |
+|-----------|-------------|
+| Python + FastAPI + onnxruntime | ~120 MB |
+| ONNX CLIP loaded | ~350+ MB |
+| ONNX MobileNet loaded | ~50–80 MB |
+| Each uploaded MP4 (until fingerprinted) | file size |
+
+Mitigations enabled for Render: `ONNX_MODEL=mobilenet`, `PRELOAD_ONNX=false`, `ONNX_BATCH_SIZE=1`, `RELEASE_VIDEO_CONTENT_AFTER_FINGERPRINT=true`, and 256px frame processing. Set `FINGERPRINT_METHOD=vpdq` for the lowest memory footprint.
 
 ## Deploy to Render
 
@@ -148,9 +160,9 @@ The CLIP ONNX model is downloaded on first use into `ONNX_MODEL_CACHE` (~300 MB)
    - **Build command:** `pip install -r requirements.txt`
    - **Start command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
    - **Python version:** `3.12.8` via `PYTHON_VERSION` env var or `.python-version`
-   - **Fingerprint method:** `FINGERPRINT_METHOD=onnx` with `ONNX_MODEL=clip` (set in `render.yaml`)
+   - **Fingerprint method:** `FINGERPRINT_METHOD=onnx` with `ONNX_MODEL=mobilenet` on free tier (see `render.yaml`)
 
-No other environment variables are required for the default ONNX CLIP deployment.
+No other environment variables are required for the default Render deployment.
 
 ## Notes
 

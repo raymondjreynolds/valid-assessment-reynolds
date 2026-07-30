@@ -19,7 +19,10 @@ PRELOAD_DINOV2 = os.environ.get("PRELOAD_DINOV2", "false").lower() in {"1", "tru
 ONNX_MODEL = os.environ.get("ONNX_MODEL", "clip").lower()
 ONNX_MODEL_CACHE = os.environ.get("ONNX_MODEL_CACHE", ".cache/onnx")
 ONNX_BATCH_SIZE = int(os.environ.get("ONNX_BATCH_SIZE", "4"))
-PRELOAD_ONNX = os.environ.get("PRELOAD_ONNX", "true").lower() in {"1", "true", "yes"}
+PRELOAD_ONNX = os.environ.get("PRELOAD_ONNX", "false").lower() in {"1", "true", "yes"}
+RELEASE_VIDEO_CONTENT_AFTER_FINGERPRINT = os.environ.get(
+    "RELEASE_VIDEO_CONTENT_AFTER_FINGERPRINT", "true"
+).lower() in {"1", "true", "yes"}
 
 
 def monotonic_now() -> float:

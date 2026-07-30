@@ -1,6 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 
-from app.config import monotonic_now
+from app.config import RELEASE_VIDEO_CONTENT_AFTER_FINGERPRINT, monotonic_now
 from app.fingerprinting import build_fingerprints
 from app.fingerprint_status import FingerprintStatus
 from app.storage import VideoStore
@@ -33,6 +33,8 @@ def run_fingerprint_job(video_id: str, store: VideoStore) -> None:
         return
 
     store.update_fingerprints(video_id, fingerprints, status=FingerprintStatus.READY)
+    if RELEASE_VIDEO_CONTENT_AFTER_FINGERPRINT:
+        store.release_video_content(video_id)
 
 
 def schedule_fingerprint_job(video_id: str, store: VideoStore) -> None:

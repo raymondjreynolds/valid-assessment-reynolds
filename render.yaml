@@ -12,17 +12,21 @@ services:
       - key: FINGERPRINT_METHOD
         value: onnx
       - key: ONNX_MODEL
-        value: clip
+        value: mobilenet
       - key: PRELOAD_ONNX
+        value: "false"
+      - key: ONNX_BATCH_SIZE
+        value: "1"
+      - key: RELEASE_VIDEO_CONTENT_AFTER_FINGERPRINT
         value: "true"
       - key: FRAME_SAMPLE_FPS
         value: "1"
       - key: MAX_FRAMES
         value: "24"
       - key: FRAME_SCALE_WIDTH
-        value: "384"
+        value: "256"
       - key: LETTERBOX_SIZE
-        value: "384"
+        value: "256"
       - key: VPDQ_HAMMING_THRESHOLD
         value: "50"
       - key: MIN_ALIGNED_FRAMES

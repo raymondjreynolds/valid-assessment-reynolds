@@ -103,16 +103,25 @@ def is_model_ready() -> bool:
     return _model_ready
 
 
+def _create_session(model_path: Path) -> ort.InferenceSession:
+    options = ort.SessionOptions()
+    options.enable_cpu_mem_arena = False
+    options.enable_mem_pattern = False
+    options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    return ort.InferenceSession(
+        str(model_path),
+        sess_options=options,
+        providers=["CPUExecutionProvider"],
+    )
+
+
 def _get_session(model_name: str | None = None) -> tuple[ort.InferenceSession, ModelSpec]:
     global _session, _model_spec, _model_ready
     spec = _resolve_model_spec(model_name)
     if _session is None or _model_spec != spec:
         model_path = _model_cache_path(spec)
         _download_model(spec, model_path)
-        _session = ort.InferenceSession(
-            str(model_path),
-            providers=["CPUExecutionProvider"],
-        )
+        _session = _create_session(model_path)
         _model_spec = spec
         _model_ready = True
     return _session, _model_spec
@@ -165,19 +174,22 @@ def _run_batch(
             [_preprocess_image(frame.image, spec) for frame in batch_frames],
             axis=0,
         )
-        outputs = session.run(output_names, {input_name: batch_input})
-        for index, frame in enumerate(batch_frames):
-            vector = _extract_embedding(
-                [output[index : index + 1] for output in outputs],
-                output_names,
-            )
-            vector = _normalize_vector(vector)
-            results.append(
-                FrameFingerprint(
-                    timestamp=frame.timestamp,
-                    dinov2=vector.astype(np.float32).tolist(),
+        try:
+            outputs = session.run(output_names, {input_name: batch_input})
+            for index, frame in enumerate(batch_frames):
+                vector = _extract_embedding(
+                    [output[index : index + 1] for output in outputs],
+                    output_names,
                 )
-            )
+                vector = _normalize_vector(vector)
+                results.append(
+                    FrameFingerprint(
+                        timestamp=frame.timestamp,
+                        dinov2=vector.astype(np.float32).tolist(),
+                    )
+                )
+        finally:
+            del batch_input
 
     return results
 

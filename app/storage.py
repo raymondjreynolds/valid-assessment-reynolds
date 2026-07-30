@@ -83,3 +83,10 @@ class VideoStore:
             video.fingerprint_method = fingerprints.method
             video.fingerprint_status = status
             video.fingerprint_error = None
+
+    def release_video_content(self, video_id: str) -> None:
+        with self._lock:
+            video = self._videos.get(video_id)
+            if video is None:
+                return
+            video.content = b""
