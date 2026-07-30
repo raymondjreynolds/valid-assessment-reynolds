@@ -20,10 +20,11 @@ def build_fingerprints(
     content: bytes,
     method: str | None = None,
     fingerprinter: VideoFingerprinter | None = None,
+    duration_seconds: float | None = None,
 ) -> FingerprintSet:
     selected = (method or FINGERPRINT_METHOD).lower()
     fingerprinter = fingerprinter or get_fingerprinter(selected)
-    frames = sample_frames(content)
+    frames = sample_frames(content, duration_seconds=duration_seconds)
     return FingerprintSet(
         method=selected,
         frames=fingerprinter.fingerprint(frames),
@@ -39,6 +40,7 @@ def fingerprint_video(
         video.content,
         method=method,
         fingerprinter=fingerprinter,
+        duration_seconds=video.duration_seconds,
     )
     return StoredVideo(
         video_id=video.video_id,
@@ -53,4 +55,5 @@ def fingerprint_video(
         fingerprint_status=video.fingerprint_status,
         fingerprint_started_at=video.fingerprint_started_at,
         fingerprint_error=video.fingerprint_error,
+        duration_seconds=video.duration_seconds,
     )

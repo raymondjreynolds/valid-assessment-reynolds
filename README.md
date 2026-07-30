@@ -72,7 +72,14 @@ If fingerprinting fails or exceeds the timeout, the API returns **HTTP 503** wit
 
 Confidence is computed as `matched_frame_ratio × mean_frame_similarity` (0–1). For **cross-bucket reframed UGC** with vPDQ, **0.5–0.7 is normal** for true matches; identical pixel-level clips would score near 1.0 but are excluded by the cross-bucket rule. Rank order matters more than the absolute value—unrelated videos should score lower than reframed versions of the same creative.
 
-Sampling more frames (`FRAME_SAMPLE_FPS`, `MAX_FRAMES`) improves temporal coverage but does **not** guarantee higher scores: extra frames that match poorly lower both the matched-frame ratio and the mean similarity. For consistently higher legitimate scores on reframed content, use **DINOv2** locally.
+Sampling is **length-aware**: frame rate and cap adjust to each video's duration (see table below). More frames improves temporal coverage but does **not** guarantee higher scores. For consistently higher legitimate scores on reframed content, use **DINOv2** locally.
+
+| Duration | Sample rate | Max frames |
+|----------|-------------|------------|
+| ≤15s | 1 fps | 12 |
+| ≤30s | 1 fps | 16 |
+| ≤60s | 0.5 fps | 20 |
+| >60s | 0.5 fps | 24 |
 
 Optional environment variables:
 
@@ -80,8 +87,8 @@ Optional environment variables:
 |----------|---------|-------------|
 | `FINGERPRINT_METHOD` | `vpdq` | `vpdq` (fast, Render default) or `dinov2` (accurate, needs PyTorch) |
 | `VPDQ_HAMMING_THRESHOLD` | `45` | Max PDQ Hamming distance for frame match |
-| `FRAME_SAMPLE_FPS` | `1` | Frame sampling rate during fingerprinting |
-| `MAX_FRAMES` | `24` | Hard cap on frames hashed per video |
+| `FRAME_SAMPLE_FPS` | `1` | Fallback sample rate when duration is unavailable |
+| `MAX_FRAMES` | `24` | Fallback frame cap for clips longer than 60 seconds |
 | `FRAME_SCALE_WIDTH` | `256` | Downscale width during ffmpeg extraction |
 | `LETTERBOX_SIZE` | `256` | Square canvas size after letterbox normalization |
 | `FRAME_SIMILARITY_THRESHOLD` | `0.75` | Minimum cosine similarity for DINOv2 frame pairs |

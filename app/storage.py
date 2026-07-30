@@ -18,6 +18,7 @@ class StoredVideo:
     fingerprint_method: str = "vpdq"
     fingerprint_status: FingerprintStatus = FingerprintStatus.PENDING
     fingerprint_started_at: float | None = None
+    duration_seconds: float | None = None
     fingerprint_error: str | None = None
 
 

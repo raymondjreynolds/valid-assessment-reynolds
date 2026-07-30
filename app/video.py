@@ -166,8 +166,59 @@ def _find_video_dimensions(data: bytes) -> tuple[int, int]:
     raise ValueError("No video stream found in file")
 
 
-def extract_video_metadata(content: bytes) -> tuple[int, int]:
+def _parse_mvhd(data: bytes, content_start: int) -> float:
+    version = data[content_start]
+    if version == 0:
+        timescale = struct.unpack_from(">I", data, content_start + 12)[0]
+        duration = struct.unpack_from(">I", data, content_start + 16)[0]
+    elif version == 1:
+        timescale = struct.unpack_from(">I", data, content_start + 20)[0]
+        duration = struct.unpack_from(">Q", data, content_start + 24)[0]
+    else:
+        raise ValueError(f"Unsupported mvhd version: {version}")
+
+    if timescale == 0:
+        raise ValueError("Invalid mvhd timescale")
+
+    return duration / timescale
+
+
+def _find_movie_duration(data: bytes) -> float:
+    offset = 0
+    end = len(data)
+
+    while offset < end:
+        header = _read_box_header(data, offset, end)
+        if header is None:
+            break
+
+        size, box_type, header_size = header
+        content_start = offset + header_size
+        box_end = offset + size
+
+        if box_type == b"moov":
+            mvhd = _find_box(data, content_start, box_end, b"mvhd")
+            if mvhd is None:
+                raise ValueError("moov is missing mvhd box")
+            mvhd_start, _ = mvhd
+            return _parse_mvhd(data, mvhd_start)
+
+        offset = box_end
+
+    raise ValueError("No moov box found in file")
+
+
+def extract_video_duration(content: bytes) -> float:
     if len(content) < 8 or content[4:8] != b"ftyp":
         raise ValueError("File is not a valid MP4")
 
-    return _find_video_dimensions(content)
+    return _find_movie_duration(content)
+
+
+def extract_video_metadata(content: bytes) -> tuple[int, int, float]:
+    if len(content) < 8 or content[4:8] != b"ftyp":
+        raise ValueError("File is not a valid MP4")
+
+    width, height = _find_video_dimensions(content)
+    duration = _find_movie_duration(content)
+    return width, height, duration

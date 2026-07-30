@@ -3,14 +3,25 @@ import struct
 from app.video import (
     compute_aspect_ratio,
     compute_ratio_bucket,
+    extract_video_duration,
     extract_video_metadata,
     generate_video_id,
 )
 
 
-def _build_minimal_mp4(width: int, height: int) -> bytes:
+def _build_minimal_mp4(
+    width: int,
+    height: int,
+    duration_seconds: float = 10.0,
+    timescale: int = 1000,
+) -> bytes:
     def box(box_type: bytes, content: bytes) -> bytes:
         return struct.pack(">I", 8 + len(content)) + box_type + content
+
+    mvhd_content = bytearray(100)
+    duration_ticks = int(duration_seconds * timescale)
+    struct.pack_into(">I", mvhd_content, 12, timescale)
+    struct.pack_into(">I", mvhd_content, 16, duration_ticks)
 
     tkhd_content = bytearray(84)
     tkhd_content[0] = 0
@@ -22,7 +33,7 @@ def _build_minimal_mp4(width: int, height: int) -> bytes:
 
     mdia = box(b"mdia", box(b"hdlr", bytes(hdlr_content)))
     trak = box(b"trak", box(b"tkhd", bytes(tkhd_content)) + mdia)
-    moov = box(b"moov", trak)
+    moov = box(b"moov", box(b"mvhd", bytes(mvhd_content)) + trak)
     ftyp = box(b"ftyp", b"isom" + b"\x00" * 4 + b"isom")
     return ftyp + moov
 
@@ -80,5 +91,10 @@ def test_video_id_is_eight_digits():
 
 
 def test_extract_video_metadata_from_mp4():
-    content = _build_minimal_mp4(1280, 720)
-    assert extract_video_metadata(content) == (1280, 720)
+    content = _build_minimal_mp4(1280, 720, duration_seconds=12.5)
+    assert extract_video_metadata(content) == (1280, 720, 12.5)
+
+
+def test_extract_video_duration_from_mp4():
+    content = _build_minimal_mp4(576, 1024, duration_seconds=28.0)
+    assert extract_video_duration(content) == 28.0

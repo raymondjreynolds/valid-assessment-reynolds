@@ -116,7 +116,7 @@ async def upload_videos(
             )
 
         try:
-            width, height = extract_video_metadata(content)
+            width, height, duration_seconds = extract_video_metadata(content)
         except ValueError as exc:
             raise HTTPException(
                 status_code=400,
@@ -135,6 +135,7 @@ async def upload_videos(
             aspect_ratio=aspect_ratio,
             ratio_bucket=ratio_bucket,
             content=content,
+            duration_seconds=duration_seconds,
             fingerprint_status=FingerprintStatus.PENDING,
             fingerprint_started_at=monotonic_now(),
         )

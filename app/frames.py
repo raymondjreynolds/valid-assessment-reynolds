@@ -39,6 +39,31 @@ def letterbox_to_square(
     return canvas
 
 
+MIN_SAMPLE_FRAMES = 4
+
+
+def plan_frame_sampling(duration_seconds: float) -> tuple[float, int]:
+    """Choose sample rate and cap based on clip length."""
+    duration = max(0.1, duration_seconds)
+
+    if duration <= 15:
+        sample_fps = 1.0
+        max_frames = 12
+    elif duration <= 30:
+        sample_fps = 1.0
+        max_frames = 16
+    elif duration <= 60:
+        sample_fps = 0.5
+        max_frames = 20
+    else:
+        sample_fps = 0.5
+        max_frames = MAX_FRAMES
+
+    available_frames = int(duration * sample_fps) + 1
+    max_frames = max(MIN_SAMPLE_FRAMES, min(max_frames, available_frames))
+    return sample_fps, max_frames
+
+
 def _subsample_frames(frames: list[SampledFrame], max_frames: int) -> list[SampledFrame]:
     if len(frames) <= max_frames:
         return frames
@@ -49,9 +74,27 @@ def _subsample_frames(frames: list[SampledFrame], max_frames: int) -> list[Sampl
 
 def sample_frames(
     content: bytes,
-    fps: float = FRAME_SAMPLE_FPS,
-    max_frames: int = MAX_FRAMES,
+    fps: float | None = None,
+    max_frames: int | None = None,
+    duration_seconds: float | None = None,
 ) -> list[SampledFrame]:
+    if fps is None or max_frames is None:
+        if duration_seconds is None:
+            try:
+                from app.video import extract_video_duration
+
+                duration_seconds = extract_video_duration(content)
+            except ValueError:
+                duration_seconds = None
+
+        if duration_seconds is not None:
+            planned_fps, planned_max = plan_frame_sampling(duration_seconds)
+        else:
+            planned_fps, planned_max = FRAME_SAMPLE_FPS, MAX_FRAMES
+
+        fps = fps if fps is not None else planned_fps
+        max_frames = max_frames if max_frames is not None else planned_max
+
     ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
 
     with tempfile.TemporaryDirectory() as temp_dir:

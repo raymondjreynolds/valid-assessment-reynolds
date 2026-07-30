@@ -20,7 +20,10 @@ def run_fingerprint_job(video_id: str, store: VideoStore) -> None:
     )
 
     try:
-        fingerprints = build_fingerprints(video.content)
+        fingerprints = build_fingerprints(
+            video.content,
+            duration_seconds=video.duration_seconds,
+        )
     except Exception as exc:
         store.set_fingerprint_status(
             video_id,

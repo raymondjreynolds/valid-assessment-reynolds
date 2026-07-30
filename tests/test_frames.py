@@ -1,6 +1,18 @@
 from PIL import Image
 
-from app.frames import SampledFrame, _subsample_frames, letterbox_to_square
+from app.frames import SampledFrame, _subsample_frames, letterbox_to_square, plan_frame_sampling
+
+
+def test_plan_frame_sampling_scales_with_duration():
+    assert plan_frame_sampling(10) == (1.0, 11)
+    assert plan_frame_sampling(15) == (1.0, 12)
+    assert plan_frame_sampling(20) == (1.0, 16)
+    assert plan_frame_sampling(45) == (0.5, 20)
+    assert plan_frame_sampling(90) == (0.5, 24)
+
+
+def test_plan_frame_sampling_enforces_minimum_for_short_clips():
+    assert plan_frame_sampling(2) == (1.0, 4)
 
 
 def test_letterbox_to_square_produces_fixed_canvas():
