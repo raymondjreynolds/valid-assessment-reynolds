@@ -236,8 +236,47 @@ def test_match_returns_processing_when_fingerprints_pending(monkeypatch):
     assert response.status_code == 202
     assert response.json() == {
         "status": "processing",
-        "message": "Fingerprints are still being computed for video 11111111",
-        "video_id": "11111111",
+        "message": "Fingerprints are still being computed",
+    }
+
+
+def test_match_returns_processing_when_any_video_fingerprint_pending(monkeypatch):
+    store = VideoStore()
+    store.store(
+        StoredVideo(
+            video_id="11111111",
+            filename="query.mp4",
+            width=576,
+            height=1024,
+            aspect_ratio="9:16",
+            ratio_bucket="9:16",
+            content=b"query",
+            fingerprint_status=FingerprintStatus.READY,
+            fingerprints=FingerprintSet(method="vpdq", frames=[]),
+        )
+    )
+    store.store(
+        StoredVideo(
+            video_id="22222222",
+            filename="candidate.mp4",
+            width=1280,
+            height=720,
+            aspect_ratio="16:9",
+            ratio_bucket="16:9",
+            content=b"candidate",
+            fingerprint_status=FingerprintStatus.PROCESSING,
+            fingerprint_started_at=0.0,
+        )
+    )
+    monkeypatch.setattr("app.main.store", store)
+    monkeypatch.setattr("app.main.matcher", VideoMatcher(store=store, prefilter=NoOpPrefilter()))
+    monkeypatch.setattr("app.fingerprint_readiness.monotonic_now", lambda: 10.0)
+
+    response = client.get("/match", params={"video_id": "11111111"})
+    assert response.status_code == 202
+    assert response.json() == {
+        "status": "processing",
+        "message": "Fingerprints are still being computed",
     }
 
 
@@ -265,4 +304,4 @@ def test_match_returns_timed_out_after_timeout(monkeypatch):
     response = client.get("/match", params={"video_id": "11111111"})
     assert response.status_code == 503
     assert response.json()["status"] == "timed_out"
-    assert response.json()["video_id"] == "11111111"
+    assert "video_id" not in response.json()

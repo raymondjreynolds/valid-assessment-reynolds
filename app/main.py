@@ -64,13 +64,11 @@ class MatchResponseItem(BaseModel):
 class MatchProcessingResponse(BaseModel):
     status: Literal["processing"]
     message: str
-    video_id: str
 
 
 class MatchErrorResponse(BaseModel):
     status: Literal["failed", "timed_out"]
     message: str
-    video_id: str
 
 
 def _to_response_item(video: StoredVideo) -> UploadResponseItem:
@@ -190,7 +188,6 @@ def match_videos(
             payload = MatchProcessingResponse(
                 status="processing",
                 message=exc.message,
-                video_id=exc.video_id,
             )
             return JSONResponse(status_code=202, content=payload.model_dump())
 
@@ -198,7 +195,6 @@ def match_videos(
         payload = MatchErrorResponse(
             status=status,
             message=exc.message,
-            video_id=exc.video_id,
         )
         return JSONResponse(status_code=503, content=payload.model_dump())
 

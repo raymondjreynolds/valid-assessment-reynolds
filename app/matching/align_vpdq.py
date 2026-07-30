@@ -53,6 +53,66 @@ def _frame_pairs(
     return pairs
 
 
+def _best_frame_matches(
+    query_frames: list[FrameFingerprint],
+    candidate_frames: list[FrameFingerprint],
+) -> list[tuple[float, int]]:
+    """Return (best_similarity, best_hamming_distance) per query frame."""
+    matches: list[tuple[float, int]] = []
+    for query_frame in query_frames:
+        if not query_frame.vpdq:
+            continue
+
+        best_distance = 256
+        best_similarity = 0.0
+
+        for candidate_frame in candidate_frames:
+            if not candidate_frame.vpdq:
+                continue
+            distance, similarity = threatengine.pdq_similarity(
+                query_frame.vpdq,
+                candidate_frame.vpdq,
+            )
+            if distance < best_distance:
+                best_distance = distance
+                best_similarity = similarity
+
+        matches.append((best_similarity, best_distance))
+
+    return matches
+
+
+def align_vpdq_fingerprints_fallback(
+    query_frames: list[FrameFingerprint],
+    candidate_frames: list[FrameFingerprint],
+    *,
+    hamming_threshold: int = VPDQ_HAMMING_THRESHOLD,
+) -> AlignmentResult | None:
+    """Score cross-bucket matches from best per-frame PDQ similarity without RANSAC."""
+    if not query_frames or not candidate_frames:
+        return None
+
+    best_matches = _best_frame_matches(query_frames, candidate_frames)
+    if not best_matches:
+        return None
+
+    matched_count = sum(
+        1 for _, distance in best_matches if distance <= hamming_threshold
+    )
+    mean_similarity = sum(similarity for similarity, _ in best_matches) / len(
+        best_matches
+    )
+    matched_frame_ratio = matched_count / len(query_frames)
+    confidence = mean_similarity * matched_frame_ratio
+
+    return AlignmentResult(
+        confidence=confidence,
+        matched_frame_ratio=matched_frame_ratio,
+        alignment="fallback",
+        inlier_count=matched_count,
+    )
+
+
 def _fit_line(points: list[tuple[float, float, float]]) -> tuple[float, float]:
     import numpy as np
 

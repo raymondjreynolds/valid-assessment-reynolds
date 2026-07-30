@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from app.matching.align import align_fingerprints
-from app.matching.align_vpdq import align_vpdq_fingerprints
+from app.matching.align_vpdq import align_vpdq_fingerprints, align_vpdq_fingerprints_fallback
 from app.storage import StoredVideo
 
 
@@ -25,6 +25,11 @@ def score_match(query: StoredVideo, candidate: StoredVideo) -> MatchResult | Non
             query.fingerprints.frames,
             candidate.fingerprints.frames,
         )
+        if alignment is None:
+            alignment = align_vpdq_fingerprints_fallback(
+                query.fingerprints.frames,
+                candidate.fingerprints.frames,
+            )
     elif method == "dinov2":
         alignment = align_fingerprints(
             query.fingerprints.frames,

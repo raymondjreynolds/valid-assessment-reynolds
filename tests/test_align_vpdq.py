@@ -4,7 +4,10 @@ import threatengine
 from PIL import Image
 
 from app.fingerprints.base import FrameFingerprint
-from app.matching.align_vpdq import align_vpdq_fingerprints
+from app.matching.align_vpdq import (
+    align_vpdq_fingerprints,
+    align_vpdq_fingerprints_fallback,
+)
 
 
 def _hash_solid_color(red: int, green: int, blue: int) -> str:
@@ -56,6 +59,29 @@ def test_align_vpdq_detects_offset_temporal_match():
 
     assert result is not None
     assert result.inlier_count >= 3
+
+
+def test_align_vpdq_fallback_scores_without_temporal_alignment():
+    query_hash = _hash_solid_color(120, 80, 40)
+    candidate_hash = _hash_solid_color(118, 79, 39)
+    query = [
+        FrameFingerprint(timestamp=0.0, vpdq=query_hash),
+        FrameFingerprint(timestamp=2.0, vpdq=query_hash),
+        FrameFingerprint(timestamp=4.0, vpdq=query_hash),
+    ]
+    candidate = [
+        FrameFingerprint(timestamp=50.0, vpdq=candidate_hash),
+        FrameFingerprint(timestamp=52.0, vpdq=candidate_hash),
+        FrameFingerprint(timestamp=54.0, vpdq=candidate_hash),
+    ]
+
+    assert align_vpdq_fingerprints(query, candidate, min_aligned_frames=5) is None
+
+    result = align_vpdq_fingerprints_fallback(query, candidate, hamming_threshold=45)
+
+    assert result is not None
+    assert result.alignment == "fallback"
+    assert result.confidence > 0
 
 
 def test_align_vpdq_rejects_unrelated_hashes():

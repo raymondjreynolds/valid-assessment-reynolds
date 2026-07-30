@@ -8,9 +8,9 @@ import numpy as np
 from PIL import Image
 
 from app.config import (
-    CENTER_CROP_FRACTION,
     FRAME_SAMPLE_FPS,
     FRAME_SCALE_WIDTH,
+    LETTERBOX_SIZE,
     MAX_FRAMES,
 )
 
@@ -21,13 +21,22 @@ class SampledFrame:
     image: Image.Image
 
 
-def center_crop(image: Image.Image, fraction: float = CENTER_CROP_FRACTION) -> Image.Image:
-    width, height = image.size
-    crop_width = max(1, int(width * fraction))
-    crop_height = max(1, int(height * fraction))
-    left = (width - crop_width) // 2
-    top = (height - crop_height) // 2
-    return image.crop((left, top, left + crop_width, top + crop_height))
+def letterbox_to_square(
+    image: Image.Image,
+    size: int = LETTERBOX_SIZE,
+) -> Image.Image:
+    """Scale content to fit inside a square canvas with centered padding."""
+    rgb = image.convert("RGB")
+    width, height = rgb.size
+    scale = min(size / width, size / height)
+    new_width = max(1, int(width * scale))
+    new_height = max(1, int(height * scale))
+    resized = rgb.resize((new_width, new_height), Image.Resampling.BILINEAR)
+    canvas = Image.new("RGB", (size, size), (0, 0, 0))
+    left = (size - new_width) // 2
+    top = (size - new_height) // 2
+    canvas.paste(resized, (left, top))
+    return canvas
 
 
 def _subsample_frames(frames: list[SampledFrame], max_frames: int) -> list[SampledFrame]:
@@ -78,11 +87,11 @@ def sample_frames(
         sampled: list[SampledFrame] = []
         for index, frame_path in enumerate(frame_paths):
             with Image.open(frame_path) as image:
-                cropped = center_crop(image.convert("RGB"))
+                normalized = letterbox_to_square(image)
                 sampled.append(
                     SampledFrame(
                         timestamp=index / fps,
-                        image=cropped.copy(),
+                        image=normalized.copy(),
                     )
                 )
 

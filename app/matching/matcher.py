@@ -27,9 +27,9 @@ class VideoMatcher:
         if query is None:
             raise KeyError(f"Video {video_id} not found")
 
-        from app.fingerprint_readiness import ensure_fingerprint_ready
+        from app.fingerprint_readiness import ensure_all_fingerprints_ready
 
-        ensure_fingerprint_ready(query, self._store)
+        ensure_all_fingerprints_ready(self._store)
 
         candidates = self.get_cross_bucket_candidates(query)
         candidates = self._prefilter.prefilter(query, candidates)
