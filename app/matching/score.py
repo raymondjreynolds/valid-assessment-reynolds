@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from app.config import MATCH_CONFIDENCE_THRESHOLD
 from app.matching.align import align_fingerprints
+from app.matching.align_vpdq import align_vpdq_fingerprints
 from app.storage import StoredVideo
 
 
@@ -12,17 +13,27 @@ class MatchResult:
     confidence: float
     matched_frame_ratio: float
     alignment: str
-    method: str = "dinov2"
+    method: str = "vpdq"
 
 
 def score_match(query: StoredVideo, candidate: StoredVideo) -> MatchResult | None:
     if query.fingerprints.is_empty or candidate.fingerprints.is_empty:
         return None
 
-    alignment = align_fingerprints(
-        query.fingerprints.frames,
-        candidate.fingerprints.frames,
-    )
+    method = query.fingerprint_method
+    if method == "vpdq":
+        alignment = align_vpdq_fingerprints(
+            query.fingerprints.frames,
+            candidate.fingerprints.frames,
+        )
+    elif method == "dinov2":
+        alignment = align_fingerprints(
+            query.fingerprints.frames,
+            candidate.fingerprints.frames,
+        )
+    else:
+        raise ValueError(f"Unsupported fingerprint method: {method}")
+
     if alignment is None:
         return None
 
@@ -35,4 +46,5 @@ def score_match(query: StoredVideo, candidate: StoredVideo) -> MatchResult | Non
         confidence=round(alignment.confidence, 4),
         matched_frame_ratio=round(alignment.matched_frame_ratio, 4),
         alignment=alignment.alignment,
+        method=method,
     )

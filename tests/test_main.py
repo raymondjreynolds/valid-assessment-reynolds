@@ -168,8 +168,10 @@ def test_match_endpoint_returns_cross_bucket_matches(monkeypatch):
             aspect_ratio="9:16",
             ratio_bucket="9:16",
             content=b"query",
+            fingerprint_method="dinov2",
             fingerprint_status=FingerprintStatus.READY,
             fingerprints=FingerprintSet(
+                method="dinov2",
                 frames=[
                     FrameFingerprint(timestamp=0.0, dinov2=[1.0, 0.0]),
                     FrameFingerprint(timestamp=1.0, dinov2=[1.0, 0.0]),
@@ -187,8 +189,10 @@ def test_match_endpoint_returns_cross_bucket_matches(monkeypatch):
             aspect_ratio="16:9",
             ratio_bucket="16:9",
             content=b"match",
+            fingerprint_method="dinov2",
             fingerprint_status=FingerprintStatus.READY,
             fingerprints=FingerprintSet(
+                method="dinov2",
                 frames=[
                     FrameFingerprint(timestamp=0.5, dinov2=[1.0, 0.0]),
                     FrameFingerprint(timestamp=1.5, dinov2=[1.0, 0.0]),

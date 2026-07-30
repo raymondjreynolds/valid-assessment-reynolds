@@ -1,47 +1,30 @@
-from __future__ import annotations
+import tempfile
+from pathlib import Path
 
-from typing import TYPE_CHECKING
+import threatengine
 
-from app.fingerprints.base import FrameFingerprint, VideoFingerprinter
+from app.fingerprints.base import FrameFingerprint
 from app.frames import SampledFrame
-
-if TYPE_CHECKING:
-    from app.storage import StoredVideo
 
 
 class VPDQFingerprinter:
-    """Placeholder for future vPDQ frame hashing at upload time."""
+    """Hash sampled frames with Meta PDQ for fast vPDQ-style matching."""
 
-    def fingerprint(self, frames: list[SampledFrame]) -> list[str | None]:
-        return [None for _ in frames]
+    def fingerprint(self, frames: list[SampledFrame]) -> list[FrameFingerprint]:
+        if not frames:
+            return []
 
+        results: list[FrameFingerprint] = []
+        with tempfile.TemporaryDirectory() as temp_dir:
+            for index, frame in enumerate(frames):
+                frame_path = Path(temp_dir) / f"frame_{index:04d}.jpg"
+                frame.image.save(frame_path, "JPEG", quality=85)
+                hash_hex, _quality = threatengine.pdq_hash_file(str(frame_path))
+                results.append(
+                    FrameFingerprint(
+                        timestamp=frame.timestamp,
+                        vpdq=hash_hex,
+                    )
+                )
 
-class VPDQPrefilter:
-    """Placeholder for future vPDQ candidate pre-filtering before DINOv2 scoring."""
-
-    def prefilter(
-        self,
-        query: StoredVideo,
-        candidates: list[StoredVideo],
-        *,
-        top_k: int = 20,
-    ) -> list[StoredVideo]:
-        raise NotImplementedError("vPDQ prefilter is not implemented yet")
-
-
-def attach_vpdq_hashes(
-    frame_fingerprints: list[FrameFingerprint],
-    vpdq_hashes: list[str | None],
-) -> list[FrameFingerprint]:
-    return [
-        FrameFingerprint(
-            timestamp=frame.timestamp,
-            dinov2=frame.dinov2,
-            vpdq=vpdq_hash,
-        )
-        for frame, vpdq_hash in zip(frame_fingerprints, vpdq_hashes, strict=True)
-    ]
-
-
-def get_vpdq_fingerprinter() -> VideoFingerprinter | None:
-    return None
+        return results

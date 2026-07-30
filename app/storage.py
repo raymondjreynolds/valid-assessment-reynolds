@@ -15,6 +15,7 @@ class StoredVideo:
     ratio_bucket: str
     content: bytes
     fingerprints: FingerprintSet = field(default_factory=FingerprintSet)
+    fingerprint_method: str = "vpdq"
     fingerprint_status: FingerprintStatus = FingerprintStatus.PENDING
     fingerprint_started_at: float | None = None
     fingerprint_error: str | None = None
@@ -78,5 +79,6 @@ class VideoStore:
             if video is None:
                 return
             video.fingerprints = fingerprints
+            video.fingerprint_method = fingerprints.method
             video.fingerprint_status = status
             video.fingerprint_error = None

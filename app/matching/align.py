@@ -51,6 +51,11 @@ def align_fingerprints(
     if not query_frames or not candidate_frames:
         return None
 
+    query_frames = [frame for frame in query_frames if frame.dinov2]
+    candidate_frames = [frame for frame in candidate_frames if frame.dinov2]
+    if not query_frames or not candidate_frames:
+        return None
+
     query_embeddings = _normalize_embeddings(query_frames)
     candidate_embeddings = _normalize_embeddings(candidate_frames)
     similarity_matrix = query_embeddings @ candidate_embeddings.T

@@ -58,7 +58,7 @@ Response:
 ]
 ```
 
-Matching is **cross-bucket only**: a query never matches videos in its own `ratio_bucket`. Uploads return immediately; DINOv2 fingerprinting runs in a background task after upload.
+Matching is **cross-bucket only**: a query never matches videos in its own `ratio_bucket`. Uploads return immediately; **vPDQ (PDQ frame hashes)** fingerprinting runs in a background task by default. Set `FINGERPRINT_METHOD=dinov2` locally for higher-accuracy matching (requires `requirements-dinov2.txt`).
 
 If `/match` is called before fingerprints are ready, the API returns **HTTP 202**:
 
@@ -76,16 +76,18 @@ Optional environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `FINGERPRINT_METHOD` | `vpdq` | `vpdq` (fast, Render default) or `dinov2` (accurate, needs PyTorch) |
+| `VPDQ_HAMMING_THRESHOLD` | `31` | Max PDQ Hamming distance for frame match |
 | `FRAME_SAMPLE_FPS` | `0.5` | Frame sampling rate during fingerprinting |
-| `MAX_FRAMES` | `12` | Hard cap on frames embedded per video |
+| `MAX_FRAMES` | `12` | Hard cap on frames hashed per video |
 | `FRAME_SCALE_WIDTH` | `256` | Downscale width during ffmpeg extraction |
-| `CENTER_CROP_FRACTION` | `0.85` | Center crop applied before embedding |
+| `CENTER_CROP_FRACTION` | `0.85` | Center crop applied before hashing |
 | `MATCH_CONFIDENCE_THRESHOLD` | `0.5` | Minimum match confidence to return |
-| `FRAME_SIMILARITY_THRESHOLD` | `0.75` | Minimum cosine similarity for frame pairs |
+| `FRAME_SIMILARITY_THRESHOLD` | `0.75` | Minimum cosine similarity for DINOv2 frame pairs |
 | `MIN_ALIGNED_FRAMES` | `3` | Minimum temporally aligned frames required |
 | `FINGERPRINT_TIMEOUT_SECONDS` | `600` | Max seconds to wait for background fingerprinting |
-| `PRELOAD_DINOV2` | `true` | Warm-load DINOv2 on service startup |
-| `TORCH_NUM_THREADS` | `2` | CPU threads used by PyTorch on Render |
+| `PRELOAD_DINOV2` | `false` | Warm-load DINOv2 on startup when using `dinov2` |
+| `TORCH_NUM_THREADS` | `2` | CPU threads used by PyTorch when using `dinov2` |
 
 ## Local development
 
@@ -96,6 +98,15 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
+For DINOv2 matching locally:
+
+```bash
+pip install -r requirements-dinov2.txt
+export FINGERPRINT_METHOD=dinov2
+export PRELOAD_DINOV2=true
+uvicorn app.main:app --reload
+```
+
 ## Deploy to Render
 
 1. Push this repo to GitHub.
@@ -103,24 +114,26 @@ uvicorn app.main:app --reload
 3. Use the included `render.yaml` Blueprint, or set:
    - **Build command:** `pip install -r requirements.txt`
    - **Start command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-   - **Python version:** `3.12.8` via `PYTHON_VERSION` env var or `.python-version` (required for PyTorch)
+   - **Python version:** `3.12.8` via `PYTHON_VERSION` env var or `.python-version`
+   - **Fingerprint method:** `FINGERPRINT_METHOD=vpdq` (set in `render.yaml`)
 
-No other environment variables are required.
+No other environment variables are required for the default vPDQ deployment.
 
 ## Notes
 
 - Only `.mp4` files are accepted.
 - `video_id` is an 8-digit ID derived from the file content (CRC32).
-- Videos, metadata, and DINOv2 fingerprints are kept in memory only and are lost on redeploy or restart.
-- The matching pipeline is pluggable: `NoOpPrefilter` passes all cross-bucket candidates to DINOv2 scoring today; a future vPDQ pre-filter can plug in without changing the API.
+- Videos, metadata, and frame fingerprints are kept in memory only and are lost on redeploy or restart.
+- Default fingerprinting uses **vPDQ/PDQ** via `threatengine` (no PyTorch on Render).
+- Set `FINGERPRINT_METHOD=dinov2` for neural embeddings when running locally with PyTorch installed.
 
 ## Architecture
 
 ```text
 upload → store video + metadata → return response
-       → background task → sample frames → DINOv2 fingerprints
+       → background task → sample frames → PDQ/vPDQ fingerprints
 GET /match → if processing: HTTP 202
-            → if ready: cross-bucket candidates → prefilter → temporal alignment → confidence score
+            → if ready: cross-bucket candidates → temporal alignment → confidence score
 ```
 
-Future vPDQ support is stubbed in `app/fingerprints/vpdq.py` and `app/matching/prefilter.py`.
+DINOv2 remains available via `FINGERPRINT_METHOD=dinov2` for higher-accuracy offline use.

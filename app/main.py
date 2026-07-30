@@ -7,7 +7,7 @@ from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from app.config import PRELOAD_DINOV2, monotonic_now
+from app.config import FINGERPRINT_METHOD, PRELOAD_DINOV2, monotonic_now
 from app.fingerprint_jobs import schedule_fingerprint_job, shutdown_fingerprint_executor
 from app.fingerprint_readiness import FingerprintNotReadyError
 from app.fingerprint_status import FingerprintStatus
@@ -27,7 +27,7 @@ from app.video import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if PRELOAD_DINOV2:
+    if PRELOAD_DINOV2 and FINGERPRINT_METHOD == "dinov2":
         threading.Thread(target=preload_dinov2, daemon=True).start()
     yield
     shutdown_fingerprint_executor()

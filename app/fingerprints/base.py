@@ -7,7 +7,7 @@ from app.frames import SampledFrame
 @dataclass
 class FrameFingerprint:
     timestamp: float
-    dinov2: list[float]
+    dinov2: list[float] | None = None
     vpdq: str | None = None
 
 
@@ -18,6 +18,7 @@ class VideoFingerprinter(Protocol):
 
 @dataclass
 class FingerprintSet:
+    method: str = "vpdq"
     frames: list[FrameFingerprint] = field(default_factory=list)
 
     @property

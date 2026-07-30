@@ -28,7 +28,8 @@ def _video(
         aspect_ratio="9:16",
         ratio_bucket=ratio_bucket,
         content=b"video",
-        fingerprints=FingerprintSet(frames=frames),
+        fingerprints=FingerprintSet(frames=frames, method="dinov2"),
+        fingerprint_method="dinov2",
         fingerprint_status=FingerprintStatus.READY,
     )
 
