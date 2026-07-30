@@ -99,8 +99,9 @@ uvicorn app.main:app --reload
 3. Use the included `render.yaml` Blueprint, or set:
    - **Build command:** `pip install -r requirements.txt`
    - **Start command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+   - **Python version:** `3.12.8` via `PYTHON_VERSION` env var or `.python-version` (required for PyTorch)
 
-No environment variables are required.
+No other environment variables are required.
 
 ## Notes
 
