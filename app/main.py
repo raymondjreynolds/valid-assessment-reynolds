@@ -1,5 +1,5 @@
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import RedirectResponse
+from fastapi.responses import Response
 from pydantic import BaseModel
 
 from app.storage import StoredVideo, VideoStore
@@ -21,12 +21,6 @@ class UploadResponseItem(BaseModel):
     aspect_ratio: str
     ratio_bucket: str
     filename: str
-
-
-class SignedUrlResponse(BaseModel):
-    video_id: str
-    url: str
-    expires_in_seconds: int
 
 
 @app.get("/health")
@@ -69,20 +63,17 @@ async def upload_videos(
         ratio_bucket = compute_ratio_bucket(aspect_ratio)
         video_id = generate_video_id(content)
 
-        video = StoredVideo(
-            video_id=video_id,
-            gcs_blob_name=f"videos/{video_id}.mp4",
-            filename=upload.filename,
-            width=width,
-            height=height,
-            aspect_ratio=aspect_ratio,
-            ratio_bucket=ratio_bucket,
+        store.store(
+            StoredVideo(
+                video_id=video_id,
+                filename=upload.filename,
+                width=width,
+                height=height,
+                aspect_ratio=aspect_ratio,
+                ratio_bucket=ratio_bucket,
+                content=content,
+            )
         )
-
-        try:
-            store.upload(video, content)
-        except RuntimeError as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
 
         results.append(
             UploadResponseItem(
@@ -98,32 +89,14 @@ async def upload_videos(
     return results
 
 
-@app.get("/videos/{video_id}/url", response_model=SignedUrlResponse)
-def get_video_signed_url(video_id: str) -> SignedUrlResponse:
-    from app.config import SIGNED_URL_EXPIRATION_SECONDS
-
-    try:
-        url = store.generate_signed_url(video_id)
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-    return SignedUrlResponse(
-        video_id=video_id,
-        url=url,
-        expires_in_seconds=SIGNED_URL_EXPIRATION_SECONDS,
-    )
-
-
 @app.get("/videos/{video_id}")
-def serve_video(video_id: str) -> RedirectResponse:
-    """Redirect to a short-lived GCS V4 signed URL."""
-    try:
-        url = store.generate_signed_url(video_id)
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+def serve_video(video_id: str) -> Response:
+    video = store.get(video_id)
+    if video is None:
+        raise HTTPException(status_code=404, detail=f"Video {video_id} not found")
 
-    return RedirectResponse(url=url, status_code=302)
+    return Response(
+        content=video.content,
+        media_type="video/mp4",
+        headers={"Content-Disposition": f'inline; filename="{video.filename}"'},
+    )

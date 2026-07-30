@@ -6,10 +6,3 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
-    envVars:
-      - key: GCS_BUCKET_NAME
-        sync: false
-      - key: GCS_CREDENTIALS_JSON
-        sync: false
-      - key: SIGNED_URL_EXPIRATION_SECONDS
-        value: "900"
