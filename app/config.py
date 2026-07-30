@@ -2,8 +2,8 @@ import os
 import time
 
 FINGERPRINT_METHOD = os.environ.get("FINGERPRINT_METHOD", "vpdq").lower()
-FRAME_SAMPLE_FPS = float(os.environ.get("FRAME_SAMPLE_FPS", "0.5"))
-MAX_FRAMES = int(os.environ.get("MAX_FRAMES", "12"))
+FRAME_SAMPLE_FPS = float(os.environ.get("FRAME_SAMPLE_FPS", "1"))
+MAX_FRAMES = int(os.environ.get("MAX_FRAMES", "24"))
 FRAME_SCALE_WIDTH = int(os.environ.get("FRAME_SCALE_WIDTH", "256"))
 LETTERBOX_SIZE = int(os.environ.get("LETTERBOX_SIZE", "256"))
 FRAME_SIMILARITY_THRESHOLD = float(os.environ.get("FRAME_SIMILARITY_THRESHOLD", "0.75"))

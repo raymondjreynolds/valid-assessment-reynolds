@@ -49,42 +49,43 @@ Response:
 [
   {
     "video_id": "63223501",
-    "ratio_bucket": "1:1",
-    "confidence": 0.84,
-    "matched_frame_ratio": 0.68,
-    "alignment": "partial",
-    "method": "dinov2"
+    "filename": "video_reframed_1-1.mp4",
+    "confidence": 0.5677
   }
 ]
 ```
 
 Matching is **cross-bucket only**: a query never matches videos in its own `ratio_bucket`. Uploads return immediately; **vPDQ (PDQ frame hashes)** fingerprinting runs in a background task by default. Set `FINGERPRINT_METHOD=dinov2` locally for higher-accuracy matching (requires `requirements-dinov2.txt`).
 
-If `/match` is called before fingerprints are ready, the API returns **HTTP 202**:
+`/match` returns **HTTP 202** until **all** uploaded videos have finished fingerprinting:
 
 ```json
 {
   "status": "processing",
-  "message": "Fingerprints are still being computed for video 59936273",
-  "video_id": "59936273"
+  "message": "Fingerprints are still being computed"
 }
 ```
 
 If fingerprinting fails or exceeds the timeout, the API returns **HTTP 503** with `status` of `failed` or `timed_out`.
+
+#### Expected confidence scores
+
+Confidence is computed as `matched_frame_ratio × mean_frame_similarity` (0–1). For **cross-bucket reframed UGC** with vPDQ, **0.5–0.7 is normal** for true matches; identical pixel-level clips would score near 1.0 but are excluded by the cross-bucket rule. Rank order matters more than the absolute value—unrelated videos should score lower than reframed versions of the same creative.
+
+Sampling more frames (`FRAME_SAMPLE_FPS`, `MAX_FRAMES`) improves temporal coverage but does **not** guarantee higher scores: extra frames that match poorly lower both the matched-frame ratio and the mean similarity. For consistently higher legitimate scores on reframed content, use **DINOv2** locally.
 
 Optional environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `FINGERPRINT_METHOD` | `vpdq` | `vpdq` (fast, Render default) or `dinov2` (accurate, needs PyTorch) |
-| `VPDQ_HAMMING_THRESHOLD` | `31` | Max PDQ Hamming distance for frame match |
-| `FRAME_SAMPLE_FPS` | `0.5` | Frame sampling rate during fingerprinting |
-| `MAX_FRAMES` | `12` | Hard cap on frames hashed per video |
+| `VPDQ_HAMMING_THRESHOLD` | `45` | Max PDQ Hamming distance for frame match |
+| `FRAME_SAMPLE_FPS` | `1` | Frame sampling rate during fingerprinting |
+| `MAX_FRAMES` | `24` | Hard cap on frames hashed per video |
 | `FRAME_SCALE_WIDTH` | `256` | Downscale width during ffmpeg extraction |
-| `CENTER_CROP_FRACTION` | `0.85` | Center crop applied before hashing |
-| `MATCH_CONFIDENCE_THRESHOLD` | `0.5` | Minimum match confidence to return |
+| `LETTERBOX_SIZE` | `256` | Square canvas size after letterbox normalization |
 | `FRAME_SIMILARITY_THRESHOLD` | `0.75` | Minimum cosine similarity for DINOv2 frame pairs |
-| `MIN_ALIGNED_FRAMES` | `3` | Minimum temporally aligned frames required |
+| `MIN_ALIGNED_FRAMES` | `2` | Minimum temporally aligned frames required |
 | `FINGERPRINT_TIMEOUT_SECONDS` | `600` | Max seconds to wait for background fingerprinting |
 | `PRELOAD_DINOV2` | `false` | Warm-load DINOv2 on startup when using `dinov2` |
 | `TORCH_NUM_THREADS` | `2` | CPU threads used by PyTorch when using `dinov2` |
@@ -132,8 +133,8 @@ No other environment variables are required for the default vPDQ deployment.
 ```text
 upload → store video + metadata → return response
        → background task → sample frames → PDQ/vPDQ fingerprints
-GET /match → if processing: HTTP 202
-            → if ready: cross-bucket candidates → temporal alignment → confidence score
+GET /match → if any video still fingerprinting: HTTP 202
+            → if ready: cross-bucket candidates → alignment → ranked confidence scores
 ```
 
 DINOv2 remains available via `FINGERPRINT_METHOD=dinov2` for higher-accuracy offline use.

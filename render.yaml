@@ -12,9 +12,9 @@ services:
       - key: FINGERPRINT_METHOD
         value: vpdq
       - key: FRAME_SAMPLE_FPS
-        value: "0.5"
+        value: "1"
       - key: MAX_FRAMES
-        value: "12"
+        value: "24"
       - key: VPDQ_HAMMING_THRESHOLD
         value: "45"
       - key: MIN_ALIGNED_FRAMES
