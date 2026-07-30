@@ -55,7 +55,7 @@ Response:
 ]
 ```
 
-Matching is **cross-bucket only**: a query never matches videos in its own `ratio_bucket`. Uploads return immediately; **vPDQ (PDQ frame hashes)** fingerprinting runs in a background task by default. Set `FINGERPRINT_METHOD=dinov2` locally for higher-accuracy matching (requires `requirements-dinov2.txt`).
+Matching is **cross-bucket only**: a query never matches videos in its own `ratio_bucket`. Videos in the **`Other`** bucket are excluded from matching entirely (as query or candidate). Uploads return immediately; **vPDQ (PDQ frame hashes)** fingerprinting runs in a background task by default. Set `FINGERPRINT_METHOD=dinov2` locally for higher-accuracy matching (requires `requirements-dinov2.txt`).
 
 `/match` returns **HTTP 202** until **all** uploaded videos have finished fingerprinting:
 

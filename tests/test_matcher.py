@@ -55,6 +55,33 @@ def test_matcher_returns_cross_bucket_matches_only():
     assert matches[0].confidence > 0
 
 
+def test_matcher_excludes_other_bucket_query():
+    store = VideoStore()
+    query = _video("11111111", "Other", vector_index=0, timestamps=[0.0, 1.0, 2.0, 3.0])
+    candidate = _video("22222222", "16:9", vector_index=0, timestamps=[0.5, 1.5, 2.5, 3.5])
+    store.store(query)
+    store.store(candidate)
+
+    matcher = VideoMatcher(store=store, prefilter=NoOpPrefilter())
+    assert matcher.match("11111111") == []
+
+
+def test_matcher_excludes_other_bucket_candidates():
+    store = VideoStore()
+    query = _video("11111111", "9:16", vector_index=0, timestamps=[0.0, 1.0, 2.0, 3.0])
+    other_bucket = _video("22222222", "Other", vector_index=0, timestamps=[0.5, 1.5, 2.5, 3.5])
+    canonical = _video("33333333", "16:9", vector_index=0, timestamps=[0.5, 1.5, 2.5, 3.5])
+    store.store(query)
+    store.store(other_bucket)
+    store.store(canonical)
+
+    matcher = VideoMatcher(store=store, prefilter=NoOpPrefilter())
+    matches = matcher.match("11111111")
+
+    assert len(matches) == 1
+    assert matches[0].video_id == "33333333"
+
+
 def test_matcher_unknown_video_raises_key_error():
     matcher = VideoMatcher(store=VideoStore(), prefilter=NoOpPrefilter())
     try:

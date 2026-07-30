@@ -38,6 +38,10 @@ def is_canonical_ratio_filter(ratio: str) -> bool:
     return ratio in CANONICAL_RATIO_BUCKETS
 
 
+def is_matchable_ratio_bucket(ratio_bucket: str) -> bool:
+    return ratio_bucket in CANONICAL_RATIO_BUCKETS
+
+
 def generate_video_id(content: bytes) -> str:
     return f"{zlib.crc32(content) % 100_000_000:08d}"
 

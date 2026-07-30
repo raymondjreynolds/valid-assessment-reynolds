@@ -38,6 +38,14 @@ def _build_minimal_mp4(
     return ftyp + moov
 
 
+def test_is_matchable_ratio_bucket():
+    from app.video import is_matchable_ratio_bucket
+
+    assert is_matchable_ratio_bucket("9:16") is True
+    assert is_matchable_ratio_bucket("1:1") is True
+    assert is_matchable_ratio_bucket("Other") is False
+
+
 def test_aspect_ratio_standard_buckets():
     assert compute_aspect_ratio(576, 1024) == "9:16"
     assert compute_aspect_ratio(576, 576) == "1:1"
