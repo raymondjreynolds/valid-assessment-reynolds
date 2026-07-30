@@ -7,7 +7,7 @@ from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from app.config import FINGERPRINT_METHOD, PRELOAD_DINOV2, monotonic_now
+from app.config import FINGERPRINT_METHOD, PRELOAD_DINOV2, PRELOAD_ONNX, monotonic_now
 from app.fingerprint_jobs import schedule_fingerprint_job, shutdown_fingerprint_executor
 from app.fingerprint_readiness import FingerprintNotReadyError
 from app.fingerprint_status import FingerprintStatus
@@ -30,6 +30,10 @@ async def lifespan(app: FastAPI):
         from app.fingerprints.dinov2 import preload_dinov2
 
         threading.Thread(target=preload_dinov2, daemon=True).start()
+    if PRELOAD_ONNX and FINGERPRINT_METHOD == "onnx":
+        from app.fingerprints.onnx_embedder import preload_onnx
+
+        threading.Thread(target=preload_onnx, daemon=True).start()
     yield
     shutdown_fingerprint_executor()
 

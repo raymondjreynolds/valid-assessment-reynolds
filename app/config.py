@@ -1,7 +1,7 @@
 import os
 import time
 
-FINGERPRINT_METHOD = os.environ.get("FINGERPRINT_METHOD", "vpdq").lower()
+FINGERPRINT_METHOD = os.environ.get("FINGERPRINT_METHOD", "onnx").lower()
 FRAME_SAMPLE_FPS = float(os.environ.get("FRAME_SAMPLE_FPS", "1"))
 MAX_FRAMES = int(os.environ.get("MAX_FRAMES", "24"))
 FRAME_SCALE_WIDTH = int(os.environ.get("FRAME_SCALE_WIDTH", "384"))
@@ -16,6 +16,10 @@ MIN_PDQ_QUALITY = int(os.environ.get("MIN_PDQ_QUALITY", "50"))
 FINGERPRINT_TIMEOUT_SECONDS = int(os.environ.get("FINGERPRINT_TIMEOUT_SECONDS", "600"))
 TORCH_NUM_THREADS = int(os.environ.get("TORCH_NUM_THREADS", "2"))
 PRELOAD_DINOV2 = os.environ.get("PRELOAD_DINOV2", "false").lower() in {"1", "true", "yes"}
+ONNX_MODEL = os.environ.get("ONNX_MODEL", "clip").lower()
+ONNX_MODEL_CACHE = os.environ.get("ONNX_MODEL_CACHE", ".cache/onnx")
+ONNX_BATCH_SIZE = int(os.environ.get("ONNX_BATCH_SIZE", "4"))
+PRELOAD_ONNX = os.environ.get("PRELOAD_ONNX", "true").lower() in {"1", "true", "yes"}
 
 
 def monotonic_now() -> float:

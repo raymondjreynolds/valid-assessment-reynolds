@@ -18,7 +18,7 @@ class VideoFingerprinter(Protocol):
 
 @dataclass
 class FingerprintSet:
-    method: str = "vpdq"
+    method: str = "onnx"
     frames: list[FrameFingerprint] = field(default_factory=list)
 
     @property

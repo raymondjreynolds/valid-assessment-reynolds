@@ -27,7 +27,7 @@ def score_match(query: StoredVideo, candidate: StoredVideo) -> MatchResult | Non
                 query.fingerprints.frames,
                 candidate.fingerprints.frames,
             )
-    elif method == "dinov2":
+    elif method in {"dinov2", "onnx"}:
         alignment = align_fingerprints(
             query.fingerprints.frames,
             candidate.fingerprints.frames,

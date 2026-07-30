@@ -10,7 +10,11 @@ services:
       - key: PYTHON_VERSION
         value: 3.12.8
       - key: FINGERPRINT_METHOD
-        value: vpdq
+        value: onnx
+      - key: ONNX_MODEL
+        value: clip
+      - key: PRELOAD_ONNX
+        value: "true"
       - key: FRAME_SAMPLE_FPS
         value: "1"
       - key: MAX_FRAMES

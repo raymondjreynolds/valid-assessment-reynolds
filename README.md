@@ -55,7 +55,7 @@ Response:
 ]
 ```
 
-Matching is **cross-bucket only**: a query never matches videos in its own `ratio_bucket`. Videos in the **`Other`** bucket are excluded from matching entirely (as query or candidate). Uploads return immediately; **vPDQ (PDQ frame hashes)** fingerprinting runs in a background task by default. Set `FINGERPRINT_METHOD=dinov2` locally for higher-accuracy matching (requires `requirements-dinov2.txt`).
+Matching is **cross-bucket only**: a query never matches videos in its own `ratio_bucket`. Videos in the **`Other`** bucket are excluded from matching entirely (as query or candidate). Uploads return immediately; fingerprinting runs in a background task. Default method is **ONNX CLIP**; set `FINGERPRINT_METHOD=vpdq` or `FINGERPRINT_METHOD=dinov2` for alternatives.
 
 `/match` returns **HTTP 202** until **all** uploaded videos have finished fingerprinting:
 
@@ -72,7 +72,7 @@ If fingerprinting fails or exceeds the timeout, the API returns **HTTP 503** wit
 
 Confidence is computed as `matched_frame_ratio × mean_frame_similarity` (0–1). For **cross-bucket reframed UGC** with vPDQ, **0.5–0.7 is normal** for true matches; identical pixel-level clips would score near 1.0 but are excluded by the cross-bucket rule. Rank order matters more than the absolute value—unrelated videos should score lower than reframed versions of the same creative.
 
-Sampling is **length-aware**: frame rate and cap adjust to each video's duration (see table below). More frames improves temporal coverage but does **not** guarantee higher scores. For consistently higher legitimate scores on reframed content, use **DINOv2** locally.
+Sampling is **length-aware**: frame rate and cap adjust to each video's duration (see table below). More frames improves temporal coverage but does **not** guarantee higher scores. For higher legitimate scores on reframed content, use **`FINGERPRINT_METHOD=onnx`** (Render-friendly) or **`FINGERPRINT_METHOD=dinov2`** locally.
 
 | Duration | Sample rate | Max frames |
 |----------|-------------|------------|
@@ -85,7 +85,11 @@ Optional environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `FINGERPRINT_METHOD` | `vpdq` | `vpdq` (fast, Render default) or `dinov2` (accurate, needs PyTorch) |
+| `FINGERPRINT_METHOD` | `onnx` | `onnx` (default CLIP), `vpdq`, or `dinov2` (PyTorch, local) |
+| `ONNX_MODEL` | `clip` | `clip` (default) or `mobilenet` when using `onnx` |
+| `ONNX_MODEL_CACHE` | `.cache/onnx` | Directory for downloaded ONNX model files |
+| `ONNX_BATCH_SIZE` | `4` | Frames per ONNX inference batch |
+| `PRELOAD_ONNX` | `true` | Warm-load ONNX model on startup when using `onnx` |
 | `VPDQ_HAMMING_THRESHOLD` | `50` | Max PDQ Hamming distance for frame match |
 | `FRAME_SAMPLE_FPS` | `1` | Fallback sample rate when duration is unavailable |
 | `MAX_FRAMES` | `24` | Fallback frame cap for clips longer than 60 seconds |
@@ -119,6 +123,23 @@ export PRELOAD_DINOV2=true
 uvicorn app.main:app --reload
 ```
 
+For ONNX embeddings (default, included in `requirements.txt`):
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Optional overrides:
+
+```bash
+export FINGERPRINT_METHOD=onnx
+export ONNX_MODEL=clip
+export PRELOAD_ONNX=true
+uvicorn app.main:app --reload
+```
+
+The CLIP ONNX model is downloaded on first use into `ONNX_MODEL_CACHE` (~300 MB). Use `ONNX_MODEL=mobilenet` for faster startup during experiments.
+
 ## Deploy to Render
 
 1. Push this repo to GitHub.
@@ -127,23 +148,23 @@ uvicorn app.main:app --reload
    - **Build command:** `pip install -r requirements.txt`
    - **Start command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
    - **Python version:** `3.12.8` via `PYTHON_VERSION` env var or `.python-version`
-   - **Fingerprint method:** `FINGERPRINT_METHOD=vpdq` (set in `render.yaml`)
+   - **Fingerprint method:** `FINGERPRINT_METHOD=onnx` with `ONNX_MODEL=clip` (set in `render.yaml`)
 
-No other environment variables are required for the default vPDQ deployment.
+No other environment variables are required for the default ONNX CLIP deployment.
 
 ## Notes
 
 - Only `.mp4` files are accepted.
 - `video_id` is an 8-digit ID derived from the file content (CRC32).
 - Videos, metadata, and frame fingerprints are kept in memory only and are lost on redeploy or restart.
-- Default fingerprinting uses **vPDQ/PDQ** via `threatengine` (no PyTorch on Render).
-- Set `FINGERPRINT_METHOD=dinov2` for neural embeddings when running locally with PyTorch installed.
+- Default fingerprinting uses **ONNX CLIP** via `onnxruntime` (model cached after first download).
+- Set `FINGERPRINT_METHOD=vpdq` for PDQ hashing or `FINGERPRINT_METHOD=dinov2` for PyTorch locally.
 
 ## Architecture
 
 ```text
 upload → store video + metadata → return response
-       → background task → sample frames → PDQ/vPDQ fingerprints
+       → background task → sample frames → ONNX CLIP / vPDQ fingerprints
 GET /match → if any video still fingerprinting: HTTP 202
             → if ready: cross-bucket candidates → alignment → ranked confidence scores
 ```
