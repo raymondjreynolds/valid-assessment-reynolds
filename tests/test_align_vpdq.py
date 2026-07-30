@@ -37,6 +37,27 @@ def test_align_vpdq_detects_matching_hashes():
     assert result.inlier_count >= 3
 
 
+def test_align_vpdq_detects_offset_temporal_match():
+    shared_hash = _hash_solid_color(120, 80, 40)
+    query = [
+        FrameFingerprint(timestamp=0.0, vpdq=shared_hash),
+        FrameFingerprint(timestamp=2.0, vpdq=shared_hash),
+        FrameFingerprint(timestamp=4.0, vpdq=shared_hash),
+        FrameFingerprint(timestamp=6.0, vpdq=shared_hash),
+    ]
+    candidate = [
+        FrameFingerprint(timestamp=10.5, vpdq=shared_hash),
+        FrameFingerprint(timestamp=12.5, vpdq=shared_hash),
+        FrameFingerprint(timestamp=14.5, vpdq=shared_hash),
+        FrameFingerprint(timestamp=16.5, vpdq=shared_hash),
+    ]
+
+    result = align_vpdq_fingerprints(query, candidate)
+
+    assert result is not None
+    assert result.inlier_count >= 3
+
+
 def test_align_vpdq_rejects_unrelated_hashes():
     query = [
         FrameFingerprint(timestamp=0.0, vpdq=_hash_solid_color(10, 10, 10)),

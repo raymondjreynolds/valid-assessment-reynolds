@@ -37,7 +37,7 @@ def _count_inliers(
     max_residual: float,
 ) -> np.ndarray:
     predicted = slope * pairs[:, 0] + intercept
-    residuals = np.abs(pairs[:, 2] - predicted)
+    residuals = np.abs(pairs[:, 1] - predicted)
     return residuals <= max_residual
 
 

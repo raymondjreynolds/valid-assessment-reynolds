@@ -29,6 +29,16 @@ def test_align_fingerprints_detects_linear_temporal_match():
     assert result.alignment in {"partial", "full"}
 
 
+def test_align_fingerprints_detects_large_temporal_offset():
+    query = _frames([0.0, 2.0, 4.0, 6.0], vector_index=0)
+    candidate = _frames([10.5, 12.5, 14.5, 16.5], vector_index=0)
+
+    result = align_fingerprints(query, candidate, similarity_threshold=0.9)
+
+    assert result is not None
+    assert result.inlier_count >= 3
+
+
 def test_align_fingerprints_rejects_unrelated_videos():
     query = _frames([0.0, 1.0, 2.0], vector_index=0)
     candidate = _frames([0.0, 1.0, 2.0], vector_index=1)

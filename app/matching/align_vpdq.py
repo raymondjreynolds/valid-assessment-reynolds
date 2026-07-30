@@ -70,7 +70,7 @@ def _count_inliers(
     import numpy as np
 
     predicted = slope * pair_array[:, 0] + intercept
-    residuals = np.abs(pair_array[:, 2] - predicted)
+    residuals = np.abs(pair_array[:, 1] - predicted)
     return residuals <= max_residual
 
 
