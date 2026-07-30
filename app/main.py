@@ -11,7 +11,6 @@ from app.config import FINGERPRINT_METHOD, PRELOAD_DINOV2, monotonic_now
 from app.fingerprint_jobs import schedule_fingerprint_job, shutdown_fingerprint_executor
 from app.fingerprint_readiness import FingerprintNotReadyError
 from app.fingerprint_status import FingerprintStatus
-from app.fingerprints.dinov2 import preload_dinov2
 from app.matching import MatchResult, VideoMatcher
 from app.matching.matcher import default_matcher
 from app.storage import StoredVideo, VideoStore
@@ -28,6 +27,8 @@ from app.video import (
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if PRELOAD_DINOV2 and FINGERPRINT_METHOD == "dinov2":
+        from app.fingerprints.dinov2 import preload_dinov2
+
         threading.Thread(target=preload_dinov2, daemon=True).start()
     yield
     shutdown_fingerprint_executor()
