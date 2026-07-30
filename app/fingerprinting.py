@@ -13,10 +13,6 @@ def get_fingerprinter(method: str | None = None) -> VideoFingerprinter:
         from app.fingerprints.dinov2 import DINOv2Fingerprinter
 
         return DINOv2Fingerprinter()
-    if selected == "onnx":
-        from app.fingerprints.onnx_embedder import ONNXFingerprinter
-
-        return ONNXFingerprinter()
     raise ValueError(f"Unsupported fingerprint method: {selected}")
 
 

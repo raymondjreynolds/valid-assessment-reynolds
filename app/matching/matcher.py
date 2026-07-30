@@ -1,4 +1,3 @@
-from app.inference_runtime import release_inference_resources
 from app.matching.prefilter import CandidatePrefilter, NoOpPrefilter
 from app.matching.score import MatchResult, score_match
 from app.storage import StoredVideo, VideoStore
@@ -36,7 +35,6 @@ class VideoMatcher:
         from app.fingerprint_readiness import ensure_all_fingerprints_ready
 
         ensure_all_fingerprints_ready(self._store)
-        release_inference_resources()
 
         candidates = self.get_cross_bucket_candidates(query)
         candidates = self._prefilter.prefilter(query, candidates)

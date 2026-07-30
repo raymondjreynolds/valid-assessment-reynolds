@@ -1,9 +1,8 @@
 from concurrent.futures import ThreadPoolExecutor
 
-from app.config import RELEASE_VIDEO_CONTENT_AFTER_FINGERPRINT, monotonic_now
+from app.config import monotonic_now
 from app.fingerprinting import build_fingerprints
 from app.fingerprint_status import FingerprintStatus
-from app.inference_runtime import release_inference_resources
 from app.storage import VideoStore
 
 _executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="fingerprint")
@@ -25,17 +24,15 @@ def run_fingerprint_job(video_id: str, store: VideoStore) -> None:
             video.content,
             duration_seconds=video.duration_seconds,
         )
-        store.update_fingerprints(video_id, fingerprints, status=FingerprintStatus.READY)
     except Exception as exc:
         store.set_fingerprint_status(
             video_id,
             FingerprintStatus.FAILED,
             error=str(exc),
         )
-    finally:
-        if RELEASE_VIDEO_CONTENT_AFTER_FINGERPRINT:
-            store.release_video_content(video_id)
-        release_inference_resources()
+        return
+
+    store.update_fingerprints(video_id, fingerprints, status=FingerprintStatus.READY)
 
 
 def schedule_fingerprint_job(video_id: str, store: VideoStore) -> None:

@@ -17,4 +17,3 @@ venv/
 # Test artifacts
 *.mp4
 .pytest_cache/
-.cache/
