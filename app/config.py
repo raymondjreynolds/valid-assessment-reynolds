@@ -1,0 +1,7 @@
+import os
+
+GCS_BUCKET_NAME = os.environ.get("GCS_BUCKET_NAME", "")
+GCS_CREDENTIALS_JSON = os.environ.get("GCS_CREDENTIALS_JSON", "")
+SIGNED_URL_EXPIRATION_SECONDS = int(
+    os.environ.get("SIGNED_URL_EXPIRATION_SECONDS", "900")
+)
