@@ -17,7 +17,5 @@ services:
         value: "12"
       - key: VPDQ_HAMMING_THRESHOLD
         value: "45"
-      - key: MATCH_CONFIDENCE_THRESHOLD
-        value: "0.35"
       - key: MIN_ALIGNED_FRAMES
         value: "2"

@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-from app.config import MATCH_CONFIDENCE_THRESHOLD
 from app.matching.align import align_fingerprints
 from app.matching.align_vpdq import align_vpdq_fingerprints
 from app.storage import StoredVideo
@@ -35,9 +34,6 @@ def score_match(query: StoredVideo, candidate: StoredVideo) -> MatchResult | Non
         raise ValueError(f"Unsupported fingerprint method: {method}")
 
     if alignment is None:
-        return None
-
-    if alignment.confidence < MATCH_CONFIDENCE_THRESHOLD:
         return None
 
     return MatchResult(
