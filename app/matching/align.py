@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from app.config import FRAME_SIMILARITY_THRESHOLD, MIN_ALIGNED_FRAMES
-from app.fingerprints.base import FrameFingerprint
+from app.fingerprints.base import FrameFingerprint, frame_embedding_vector, has_frame_embedding
 
 
 @dataclass(frozen=True)
@@ -15,9 +15,15 @@ class AlignmentResult:
 
 
 def _normalize_embeddings(fingerprints: list[FrameFingerprint]) -> np.ndarray:
-    matrix = np.asarray([frame.dinov2 for frame in fingerprints], dtype=np.float32)
-    if matrix.size == 0:
-        return matrix
+    vectors = [
+        frame_embedding_vector(frame)
+        for frame in fingerprints
+        if has_frame_embedding(frame)
+    ]
+    if not vectors:
+        return np.empty((0, 0), dtype=np.float32)
+
+    matrix = np.stack(vectors, dtype=np.float32)
     norms = np.linalg.norm(matrix, axis=1, keepdims=True)
     norms[norms == 0] = 1.0
     return matrix / norms
@@ -51,8 +57,8 @@ def align_fingerprints(
     if not query_frames or not candidate_frames:
         return None
 
-    query_frames = [frame for frame in query_frames if frame.dinov2]
-    candidate_frames = [frame for frame in candidate_frames if frame.dinov2]
+    query_frames = [frame for frame in query_frames if has_frame_embedding(frame)]
+    candidate_frames = [frame for frame in candidate_frames if has_frame_embedding(frame)]
     if not query_frames or not candidate_frames:
         return None
 

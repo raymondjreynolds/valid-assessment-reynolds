@@ -50,6 +50,22 @@ def test_normalize_vector_unit_length():
     assert pytest.approx(float(np.linalg.norm(vector)), rel=1e-6) == 1.0
 
 
+def test_release_onnx_session_clears_loaded_model(monkeypatch):
+    session = MagicMock()
+    monkeypatch.setattr(
+        "app.fingerprints.onnx_embedder._session",
+        session,
+        raising=False,
+    )
+    monkeypatch.setattr("app.fingerprints.onnx_embedder._model_ready", True, raising=False)
+
+    from app.fingerprints.onnx_embedder import is_model_ready, release_onnx_session
+
+    release_onnx_session()
+
+    assert is_model_ready() is False
+
+
 def test_onnx_fingerprinter_emits_normalized_embeddings(monkeypatch):
     session = MagicMock()
     input_info = MagicMock()
@@ -71,8 +87,9 @@ def test_onnx_fingerprinter_emits_normalized_embeddings(monkeypatch):
     results = ONNXFingerprinter().fingerprint(frames)
 
     assert len(results) == 2
-    assert results[0].dinov2 is not None
-    assert pytest.approx(np.linalg.norm(results[0].dinov2), rel=1e-6) == 1.0
+    assert results[0].embedding is not None
+    vector = np.frombuffer(results[0].embedding, dtype=np.float32)
+    assert pytest.approx(float(np.linalg.norm(vector)), rel=1e-6) == 1.0
 
 
 def test_get_fingerprinter_supports_onnx():

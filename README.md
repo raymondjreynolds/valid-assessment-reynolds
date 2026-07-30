@@ -150,7 +150,7 @@ The CLIP ONNX model is downloaded on first use into `ONNX_MODEL_CACHE` (~300 MB 
 | ONNX MobileNet loaded | ~50–80 MB |
 | Each uploaded MP4 (until fingerprinted) | file size |
 
-Mitigations enabled for Render: `ONNX_MODEL=mobilenet`, `PRELOAD_ONNX=false`, `ONNX_BATCH_SIZE=1`, `RELEASE_VIDEO_CONTENT_AFTER_FINGERPRINT=true`, and 256px frame processing. Set `FINGERPRINT_METHOD=vpdq` for the lowest memory footprint.
+Mitigations enabled for Render: `ONNX_MODEL=mobilenet`, `PRELOAD_ONNX=false`, `ONNX_BATCH_SIZE=1`, `RELEASE_VIDEO_CONTENT_AFTER_FINGERPRINT=true`, 256px frame processing, compact float32 embedding storage, and unloading the ONNX model after fingerprinting and before `/match`. Set `FINGERPRINT_METHOD=vpdq` for the lowest memory footprint.
 
 ## Deploy to Render
 

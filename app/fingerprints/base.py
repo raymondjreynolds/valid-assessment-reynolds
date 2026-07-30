@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Protocol
 
+import numpy as np
+
 from app.frames import SampledFrame
 
 
@@ -8,7 +10,20 @@ from app.frames import SampledFrame
 class FrameFingerprint:
     timestamp: float
     dinov2: list[float] | None = None
+    embedding: bytes | None = None
     vpdq: str | None = None
+
+
+def frame_embedding_vector(frame: FrameFingerprint) -> np.ndarray | None:
+    if frame.embedding is not None:
+        return np.frombuffer(frame.embedding, dtype=np.float32)
+    if frame.dinov2 is not None:
+        return np.asarray(frame.dinov2, dtype=np.float32)
+    return None
+
+
+def has_frame_embedding(frame: FrameFingerprint) -> bool:
+    return frame.embedding is not None or frame.dinov2 is not None
 
 
 class VideoFingerprinter(Protocol):

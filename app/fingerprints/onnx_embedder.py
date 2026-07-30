@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 import threading
 import urllib.request
 from dataclasses import dataclass
@@ -103,6 +104,16 @@ def is_model_ready() -> bool:
     return _model_ready
 
 
+def release_onnx_session() -> None:
+    """Unload the ONNX model to free memory during matching."""
+    global _session, _model_spec, _model_ready
+    with _load_lock:
+        _session = None
+        _model_spec = None
+        _model_ready = False
+    gc.collect()
+
+
 def _create_session(model_path: Path) -> ort.InferenceSession:
     options = ort.SessionOptions()
     options.enable_cpu_mem_arena = False
@@ -185,7 +196,7 @@ def _run_batch(
                 results.append(
                     FrameFingerprint(
                         timestamp=frame.timestamp,
-                        dinov2=vector.astype(np.float32).tolist(),
+                        embedding=vector.astype(np.float32).tobytes(),
                     )
                 )
         finally:
