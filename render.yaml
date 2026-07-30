@@ -23,5 +23,7 @@ services:
         value: "50"
       - key: MIN_ALIGNED_FRAMES
         value: "2"
+      - key: MATCH_CONFIDENCE_THRESHOLD
+        value: "0.5"
       - key: FFMPEG_FRAME_QUALITY
         value: "2"

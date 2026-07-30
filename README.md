@@ -70,7 +70,9 @@ If fingerprinting fails or exceeds the timeout, the API returns **HTTP 503** wit
 
 #### Expected confidence scores
 
-Confidence is computed as `matched_frame_ratio × mean_frame_similarity` (0–1). For **cross-bucket reframed UGC** with vPDQ, **0.5–0.7 is normal** for true matches; identical pixel-level clips would score near 1.0 but are excluded by the cross-bucket rule. Rank order matters more than the absolute value—unrelated videos should score lower than reframed versions of the same creative.
+Confidence is computed as `matched_frame_ratio × mean_frame_similarity` (0–1). For **cross-bucket reframed UGC** with vPDQ, **0.5–0.7 is normal** for true matches; identical pixel-level clips would score near 1.0 but are excluded by the cross-bucket rule. Unrelated videos should score lower than reframed versions of the same creative.
+
+`/match` returns only candidates at or above `MATCH_CONFIDENCE_THRESHOLD` (default **0.50**), sorted by confidence descending. Use **0.35–0.40** for maximum recall on heavily reframed clips.
 
 Sampling is **length-aware**: frame rate and cap adjust to each video's duration (see table below). More frames improves temporal coverage but does **not** guarantee higher scores. For consistently higher legitimate scores on reframed content, use **DINOv2** locally.
 
@@ -86,6 +88,7 @@ Optional environment variables:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `FINGERPRINT_METHOD` | `vpdq` | `vpdq` (fast, Render default) or `dinov2` (accurate, needs PyTorch) |
+| `MATCH_CONFIDENCE_THRESHOLD` | `0.50` | Minimum match confidence returned by `/match` |
 | `VPDQ_HAMMING_THRESHOLD` | `50` | Max PDQ Hamming distance for frame match |
 | `FRAME_SAMPLE_FPS` | `1` | Fallback sample rate when duration is unavailable |
 | `MAX_FRAMES` | `24` | Fallback frame cap for clips longer than 60 seconds |
