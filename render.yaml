@@ -9,3 +9,9 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.8
+      - key: FRAME_SAMPLE_FPS
+        value: "0.5"
+      - key: MAX_FRAMES
+        value: "12"
+      - key: PRELOAD_DINOV2
+        value: "true"

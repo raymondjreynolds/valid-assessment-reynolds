@@ -7,7 +7,12 @@ import imageio_ffmpeg
 import numpy as np
 from PIL import Image
 
-from app.config import CENTER_CROP_FRACTION, FRAME_SAMPLE_FPS
+from app.config import (
+    CENTER_CROP_FRACTION,
+    FRAME_SAMPLE_FPS,
+    FRAME_SCALE_WIDTH,
+    MAX_FRAMES,
+)
 
 
 @dataclass(frozen=True)
@@ -25,7 +30,19 @@ def center_crop(image: Image.Image, fraction: float = CENTER_CROP_FRACTION) -> I
     return image.crop((left, top, left + crop_width, top + crop_height))
 
 
-def sample_frames(content: bytes, fps: float = FRAME_SAMPLE_FPS) -> list[SampledFrame]:
+def _subsample_frames(frames: list[SampledFrame], max_frames: int) -> list[SampledFrame]:
+    if len(frames) <= max_frames:
+        return frames
+
+    indices = np.linspace(0, len(frames) - 1, max_frames, dtype=int)
+    return [frames[index] for index in indices]
+
+
+def sample_frames(
+    content: bytes,
+    fps: float = FRAME_SAMPLE_FPS,
+    max_frames: int = MAX_FRAMES,
+) -> list[SampledFrame]:
     ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -34,6 +51,8 @@ def sample_frames(content: bytes, fps: float = FRAME_SAMPLE_FPS) -> list[Sampled
         frames_dir.mkdir()
         video_path.write_bytes(content)
 
+        # Downscale during decode to reduce ffmpeg + PIL + inference cost.
+        filter_chain = f"fps={fps},scale={FRAME_SCALE_WIDTH}:-2"
         output_pattern = str(frames_dir / "frame_%04d.jpg")
         command = [
             ffmpeg,
@@ -43,9 +62,9 @@ def sample_frames(content: bytes, fps: float = FRAME_SAMPLE_FPS) -> list[Sampled
             "-i",
             str(video_path),
             "-vf",
-            f"fps={fps}",
+            filter_chain,
             "-qscale:v",
-            "2",
+            "4",
             output_pattern,
         ]
         result = subprocess.run(command, capture_output=True, text=True, check=False)
@@ -67,7 +86,7 @@ def sample_frames(content: bytes, fps: float = FRAME_SAMPLE_FPS) -> list[Sampled
                     )
                 )
 
-        return sampled
+        return _subsample_frames(sampled, max_frames)
 
 
 def is_dark_frame(image: Image.Image, threshold: float = 12.0) -> bool:

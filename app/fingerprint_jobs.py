@@ -1,7 +1,11 @@
+from concurrent.futures import ThreadPoolExecutor
+
 from app.config import monotonic_now
 from app.fingerprinting import build_fingerprints
 from app.fingerprint_status import FingerprintStatus
 from app.storage import VideoStore
+
+_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="fingerprint")
 
 
 def run_fingerprint_job(video_id: str, store: VideoStore) -> None:
@@ -29,4 +33,8 @@ def run_fingerprint_job(video_id: str, store: VideoStore) -> None:
 
 
 def schedule_fingerprint_job(video_id: str, store: VideoStore) -> None:
-    run_fingerprint_job(video_id, store)
+    _executor.submit(run_fingerprint_job, video_id, store)
+
+
+def shutdown_fingerprint_executor() -> None:
+    _executor.shutdown(wait=False, cancel_futures=True)

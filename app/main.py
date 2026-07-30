@@ -1,13 +1,17 @@
+import threading
 from typing import Literal
 
-from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Query, UploadFile
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from app.config import monotonic_now
-from app.fingerprint_jobs import schedule_fingerprint_job
+from app.config import PRELOAD_DINOV2, monotonic_now
+from app.fingerprint_jobs import schedule_fingerprint_job, shutdown_fingerprint_executor
 from app.fingerprint_readiness import FingerprintNotReadyError
 from app.fingerprint_status import FingerprintStatus
+from app.fingerprints.dinov2 import preload_dinov2
 from app.matching import MatchResult, VideoMatcher
 from app.matching.matcher import default_matcher
 from app.storage import StoredVideo, VideoStore
@@ -20,7 +24,16 @@ from app.video import (
     is_valid_video_id,
 )
 
-app = FastAPI(title="Valid Assessment Video API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if PRELOAD_DINOV2:
+        threading.Thread(target=preload_dinov2, daemon=True).start()
+    yield
+    shutdown_fingerprint_executor()
+
+
+app = FastAPI(title="Valid Assessment Video API", version="1.0.0", lifespan=lifespan)
 store = VideoStore()
 matcher = default_matcher(store)
 
@@ -88,7 +101,6 @@ def health() -> dict[str, str]:
 
 @app.post("/upload", response_model=list[UploadResponseItem])
 async def upload_videos(
-    background_tasks: BackgroundTasks,
     files: list[UploadFile] = File(...),
 ) -> list[UploadResponseItem]:
     if not files:
@@ -134,7 +146,7 @@ async def upload_videos(
             fingerprint_started_at=monotonic_now(),
         )
         store.store(video)
-        background_tasks.add_task(schedule_fingerprint_job, video_id, store)
+        schedule_fingerprint_job(video_id, store)
         results.append(_to_response_item(video))
 
     return results

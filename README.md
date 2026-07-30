@@ -76,12 +76,16 @@ Optional environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `FRAME_SAMPLE_FPS` | `1.0` | Frame sampling rate during fingerprinting |
+| `FRAME_SAMPLE_FPS` | `0.5` | Frame sampling rate during fingerprinting |
+| `MAX_FRAMES` | `12` | Hard cap on frames embedded per video |
+| `FRAME_SCALE_WIDTH` | `256` | Downscale width during ffmpeg extraction |
 | `CENTER_CROP_FRACTION` | `0.85` | Center crop applied before embedding |
 | `MATCH_CONFIDENCE_THRESHOLD` | `0.5` | Minimum match confidence to return |
 | `FRAME_SIMILARITY_THRESHOLD` | `0.75` | Minimum cosine similarity for frame pairs |
 | `MIN_ALIGNED_FRAMES` | `3` | Minimum temporally aligned frames required |
-| `FINGERPRINT_TIMEOUT_SECONDS` | `300` | Max seconds to wait for background fingerprinting |
+| `FINGERPRINT_TIMEOUT_SECONDS` | `600` | Max seconds to wait for background fingerprinting |
+| `PRELOAD_DINOV2` | `true` | Warm-load DINOv2 on service startup |
+| `TORCH_NUM_THREADS` | `2` | CPU threads used by PyTorch on Render |
 
 ## Local development
 
